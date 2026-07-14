@@ -1,0 +1,56 @@
+# ============================================================
+# AUTOMATED TRADING STRATEGIES — CONFIGURATION
+# ============================================================
+# Secrets (API keys) live in .env — do NOT put them here.
+# This file is safe to share. .env is not.
+
+# ------------------------------------------------------------
+# MEXC EXCHANGE
+# ------------------------------------------------------------
+mexc:
+  # Credentials come from .env — see .env.example
+
+  # "paper" = MEXC Demo Trading (testnet, safe for testing)
+  # "live"  = Real money trading (enable only when fully tested)
+  mode: "paper"
+
+  default_market_type: "futures"
+  default_leverage: 5
+  max_leverage: 10
+
+# ------------------------------------------------------------
+# BB CHANNEL RIDER BOT
+# ------------------------------------------------------------
+bb_bot:
+  # Which symbols to trade. Each entry is one independent bot instance.
+  # Run:  python3 bots/bb_bot.py --symbol BTC   (matches symbol_key below)
+  #
+  # contract_lot (BTC per contract) is fetched automatically from MEXC
+  # via exchange.load_markets() on startup — the value here is only used
+  # as a fallback if the API does not return it.
+  symbols:
+    - symbol_key:       "BTC"
+      ccxt_symbol:      "BTC/USDT:USDT"
+      contract_lot:     0.0001          # fallback only — loaded from MEXC at runtime
+      leverage:         10
+      sizing_pct:       0.25
+      starting_capital: 1000.0         # paper mode only; live reads real balance
+
+  # Strategy params are frozen — see STRATEGY_SPEC.md and strategies/bb_channel.py.
+  # Do not change without re-running the Gate 2 grid search + full audit.
+
+# Optional: Telegram Bot API notifications when a trade opens/closes.
+# (A simple one-way alert bot — get a token from @BotFather, message it
+# once to activate the chat. Not required to run the strategy or backtest.)
+telegram_bot:
+  token:   ""   # or set TELEGRAM_BOT_TOKEN in .env
+  chat_id: ""   # or set TELEGRAM_NOTIFY_USER_ID in .env
+
+# ------------------------------------------------------------
+# LOGGING
+# ------------------------------------------------------------
+logging:
+  level: "INFO"           # DEBUG, INFO, WARNING, ERROR
+  log_file: "logs/bot.log"
+  max_file_size_mb: 10
+  backup_count: 3

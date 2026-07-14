@@ -1,0 +1,26 @@
+# Secrets — never commit
+.env
+
+# Claude Code internals
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+.venv/
+
+# Logs (runtime output, not source)
+logs/
+
+# macOS
+.DS_Store
+
+# Large downloaded market data — re-fetchable from the exchange
+data/ohlcv/
+
+# Bot runtime state — regenerated on each run
+data/state/
+data/trades/
