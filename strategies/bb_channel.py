@@ -10,6 +10,8 @@ from here. Parity between backtest and live bot is guaranteed by construction.
 See STRATEGY_SPEC.md for the full locked specification (2026-05-10).
 """
 
+from __future__ import annotations
+
 import math
 from typing import Optional
 
