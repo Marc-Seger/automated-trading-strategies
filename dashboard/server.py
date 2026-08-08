@@ -76,11 +76,12 @@ os.makedirs(_IND_CACHE_DIR, exist_ok=True)
 _TF_MS = {
     "1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
     "1h": 3_600_000, "4h": 14_400_000, "8h": 28_800_000, "1d": 86_400_000,
+    "1w": 604_800_000,
 }
 # Default lookback (days) when no date range specified — stays within MEXC's per-timeframe cap
 _TF_DEFAULT_LOOKBACK = {
     "1m": 7, "5m": 120, "15m": 355, "30m": 355,
-    "1h": 400, "4h": 1600, "8h": 3200, "1d": 3650,
+    "1h": 400, "4h": 1600, "8h": 3200, "1d": 3650, "1w": 3650,
 }
 _WARMUP_CANDLES = 300   # extra candles fetched before display window for indicator warmup
 
@@ -642,17 +643,37 @@ def api_bb_bot_status():
 # ---------------------------------------------------------------------------
 
 
+# Candle resolution auto-selected from the visible span, same idea as most
+# charting tools (TradingView etc): finer candles up close, coarser candles
+# zoomed out, so the bar count stays readable at any range.
+_RESOLUTION_BREAKPOINTS = [
+    (24 * 3600 * 1000,        "15m"),
+    (3  * 24 * 3600 * 1000,   "1h"),
+    (10 * 24 * 3600 * 1000,   "4h"),
+    (365 * 24 * 3600 * 1000,  "1d"),
+]
+
+def _timeframe_for_span(span_ms: int) -> str:
+    for max_span, tf in _RESOLUTION_BREAKPOINTS:
+        if span_ms <= max_span:
+            return tf
+    return "1w"
+
+
 @app.route("/api/live_chart")
 def api_live_chart():
     """
-    Return 15m OHLCV + BB(20,3.0) + EMA(150) for the live bot price chart.
+    Return OHLCV + BB(20,3.0) + EMA(150) for the live bot price chart, at a
+    candle resolution auto-selected from the requested span (15m up to 24h,
+    1h up to 3 days, 4h up to 10 days, 1d up to a year, 1w beyond that).
     Uses the same gap-filling indicator cache as the indicator backtest tab.
-    Default display window spans the candle before the earliest of the last 5
-    trades through now (1 day minimum if no trades exist yet); warmup candles
-    are fetched on top so indicators are fully seeded.
 
     Query params:
       symbol — symbol_key from config (default "BTC")
+      from, to — ISO date/datetime strings for the display window. If either
+        is omitted, defaults to the candle before the earliest of the last 5
+        trades through now (1 day minimum if no trades exist yet) — same
+        default as before explicit ranges existed.
     """
     from strategies.bb_channel import (
         compute_bb, compute_ema, BB_PERIOD, BB_STD, TREND_PERIOD,
@@ -661,35 +682,52 @@ def api_live_chart():
     symbol_key = request.args.get("symbol", "BTC").upper()
     ccxt_sym   = f"{symbol_key}/USDT"          # cache key format (spot-style)
 
-    now_ms      = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
-    CANDLE_MS   = 900_000  # 15m
+    now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
 
-    # Default window: candle before the open of the earliest of the last 5 trades
-    # (open or closed) through the live candle. Falls back to 1 day if no trades yet.
-    trades_path = os.path.join(BASE_DIR, "data", "trades", f"bb_bot_trades_{symbol_key}.json")
-    trades = []
-    if os.path.exists(trades_path):
+    from_param = request.args.get("from")
+    to_param   = request.args.get("to")
+
+    if from_param and to_param:
         try:
-            with open(trades_path) as f:
-                trades = json.load(f)
-        except Exception:
-            trades = []
-
-    last5 = sorted(
-        (t for t in trades if t.get("entry_ts")),
-        key=lambda t: t["entry_ts"],
-    )[-5:]
-    if last5:
-        earliest_entry_ms = min(t["entry_ts"] for t in last5)
-        display_ms = now_ms - (earliest_entry_ms - CANDLE_MS)
+            from_ms = int(datetime.fromisoformat(from_param.replace("Z", "+00:00")).timestamp() * 1000)
+            to_ms   = int(datetime.fromisoformat(to_param.replace("Z", "+00:00")).timestamp() * 1000)
+        except ValueError:
+            return jsonify({"error": "from/to must be ISO date or datetime strings"}), 400
     else:
-        display_ms = 24 * 3600 * 1000   # 1 day minimum when no trades exist yet
+        # Default window: candle before the open of the earliest of the last 5
+        # trades (open or closed) through the live candle. Falls back to 1 day
+        # if no trades exist yet.
+        trades_path = os.path.join(BASE_DIR, "data", "trades", f"bb_bot_trades_{symbol_key}.json")
+        trades = []
+        if os.path.exists(trades_path):
+            try:
+                with open(trades_path) as f:
+                    trades = json.load(f)
+            except Exception:
+                trades = []
 
-    warmup_ms   = max(BB_PERIOD, TREND_PERIOD) * 900_000   # candles needed to seed indicators
-    fetch_from  = now_ms - display_ms - warmup_ms * 3      # generous extra buffer
+        last5 = sorted(
+            (t for t in trades if t.get("entry_ts")),
+            key=lambda t: t["entry_ts"],
+        )[-5:]
+        to_ms = now_ms
+        if last5:
+            earliest_entry_ms = min(t["entry_ts"] for t in last5)
+            from_ms = earliest_entry_ms - 900_000   # candle before, at 15m resolution
+        else:
+            from_ms = now_ms - 24 * 3600 * 1000     # 1 day minimum when no trades exist yet
+
+    if to_ms <= from_ms:
+        return jsonify({"error": "to must be after from"}), 400
+
+    timeframe = _timeframe_for_span(to_ms - from_ms)
+    candle_ms = _TF_MS[timeframe]
+
+    warmup_ms  = max(BB_PERIOD, TREND_PERIOD) * candle_ms   # candles needed to seed indicators
+    fetch_from = from_ms - warmup_ms * 3                    # generous extra buffer
 
     try:
-        candles = ensure_indicator_candles(ccxt_sym, "15m", fetch_from, now_ms)
+        candles = ensure_indicator_candles(ccxt_sym, timeframe, fetch_from, to_ms)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -700,7 +738,7 @@ def api_live_chart():
     ema_series = compute_ema(candles, TREND_PERIOD)
 
     # Only ship the display window to the client (warmup stays server-side)
-    display_from_ms = now_ms - display_ms - 900_000 * 10   # 10 candle grace on left edge
+    display_from_ms = from_ms - candle_ms * 10   # 10 candle grace on left edge
     out_candles  = []
     out_bb_upper = []
     out_bb_mid   = []
@@ -708,7 +746,7 @@ def api_live_chart():
     out_ema      = []
 
     for i, c in enumerate(candles):
-        if c[0] < display_from_ms:
+        if c[0] < display_from_ms or c[0] > to_ms:
             continue
         out_candles.append(c)
         bb = bb_series[i]
@@ -723,8 +761,10 @@ def api_live_chart():
         "bb_mid":    out_bb_mid,
         "bb_lower":  out_bb_lower,
         "ema":       out_ema,
+        "timeframe": timeframe,
+        "from_ms":   from_ms,
+        "to_ms":     to_ms,
         "now_ms":    now_ms,
-        "display_ms": display_ms,
     })
 
 

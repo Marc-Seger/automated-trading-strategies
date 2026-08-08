@@ -988,16 +988,24 @@
 
   <!-- Live price chart -->
   <div class="mx-6 mb-3 flex-shrink-0 bg-gray-900 rounded-xl p-4" style="height:300px;">
-    <div class="flex items-center justify-between mb-2">
-      <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-        BTC/USDT · 15m &nbsp;·&nbsp;
+    <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+      <span id="live-chart-hdr" class="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+        BTC/USDT · 15M &nbsp;·&nbsp;
         <span class="text-indigo-400">BB(20, 3.0)</span> &nbsp;·&nbsp;
         <span class="text-yellow-400">EMA-150</span>
       </span>
-      <button onclick="livePriceResetZoom()"
-        class="text-xs px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-400">
-        Reset Zoom
-      </button>
+      <div class="flex items-center gap-1.5 text-xs text-gray-400">
+        <span>From</span>
+        <input type="date" id="live-chart-from"
+          class="bg-gray-800 border border-gray-700 text-gray-100 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-indigo-500">
+        <span>to</span>
+        <input type="date" id="live-chart-to"
+          class="bg-gray-800 border border-gray-700 text-gray-100 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-indigo-500">
+        <button onclick="liveApplyDateRange()"
+          class="px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold">
+          Apply
+        </button>
+      </div>
     </div>
     <div class="relative" style="height:252px;">
       <canvas id="live-price-canvas"></canvas>
@@ -1222,6 +1230,8 @@ let _livePriceSymbol     = null;   // symbol the chart was built for
 let _livePriceLastCandle = null;   // ts of last candle — detect new data
 let _liveTradesForModal  = [];     // closed trades shown in the table, indexed for the detail modal
 let liveModalChart        = null;  // Chart.js instance for the live trade detail modal
+let _liveLastState        = null;  // most recent bot state, cached so the date-range Apply button doesn't need a refetch
+let _liveLastTrades       = null;  // most recent trades array, same reason
 
 function showDoc(id) {
   document.querySelectorAll(".doc-section").forEach(el => el.classList.add("hidden"));
@@ -2165,21 +2175,67 @@ function liveAutoRefreshToggle() {
 }
 
 /* ── Live price chart helpers ── */
-let _livePriceWheelHandler = null;
+// The currently-applied display window — set on every successful chart
+// build (initial default load or a manual date-range Apply) so periodic
+// 15s auto-refreshes know what range to keep showing instead of silently
+// resetting back to "today" on every tick.
+let _liveChartFromMs = null;
+let _liveChartToMs   = null;
 
-function livePriceResetZoom() {
-  if (!livePriceChart) return;
-  livePriceChart.resetZoom();
-  const sc = livePriceChart.options.scales.x;
-  sc.time = Object.assign({}, sc.time, { unit: _indTimeUnit(sc.min, sc.max) });
-  livePriceChart.update("none");
+// A range counts as "live" when its end date is today (UTC) — in that case
+// the upper bound tracks the current moment on every refresh, same as
+// before explicit date ranges existed. A range ending in the past is a
+// frozen historical view and stays exactly as picked.
+function _liveRangeIsLive(toMs) {
+  const now = new Date();
+  const end = new Date(toMs);
+  return end.getUTCFullYear() === now.getUTCFullYear()
+      && end.getUTCMonth()    === now.getUTCMonth()
+      && end.getUTCDate()     === now.getUTCDate();
+}
+
+function _liveDateInputToMs(inputEl, endOfDay) {
+  const v = inputEl.value; // "YYYY-MM-DD"
+  if (!v) return null;
+  const iso = endOfDay ? `${v}T23:59:59.999Z` : `${v}T00:00:00.000Z`;
+  return new Date(iso).getTime();
+}
+
+function _liveMsToDateInputValue(ms) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+// Marker size scales down as the visible span widens, same principle as
+// the Backtest tab's chart — a fixed-size circle that looks right on a
+// 1-day view would swallow whole candles on a 1-year one.
+function _liveMarkerRadius(spanMs) {
+  const h = spanMs / 3_600_000;
+  if (h <= 30)   return 11;
+  if (h <= 100)  return 9;
+  if (h <= 400)  return 7;
+  return 5;
+}
+
+function liveApplyDateRange() {
+  const fromMs = _liveDateInputToMs(document.getElementById("live-chart-from"), false);
+  const toMs   = _liveDateInputToMs(document.getElementById("live-chart-to"), true);
+  if (fromMs == null || toMs == null || toMs <= fromMs) {
+    alert("Pick a valid From/To range (To must be after From).");
+    return;
+  }
+  liveBuildChart(_liveLastState, _liveLastTrades, { fromMs, toMs });
 }
 
 // Lightweight update — only replaces annotation values, no data reload
 function liveUpdateChartAnnotations(state) {
   if (!livePriceChart) return;
   const annotations = {};
-  if (state && state.phase === "in_position") {
+  // Only draw the live position's entry/TP/SL/backstop lines if "now" is
+  // actually inside the displayed window — showing today's open-position
+  // lines across an unrelated historical range would be misleading.
+  const nowInRange = _liveChartFromMs != null && _liveChartToMs != null
+    && Date.now() >= _liveChartFromMs && Date.now() <= _liveChartToMs;
+  if (nowInRange && state && state.phase === "in_position") {
     if (state.pos_entry) annotations.entry = {
       type: "line", scaleID: "y", value: state.pos_entry,
       borderColor: "#6b8fae", borderWidth: 1, borderDash: [4, 4],
@@ -2205,19 +2261,32 @@ function liveUpdateChartAnnotations(state) {
   livePriceChart.update("none");
 }
 
-async function liveBuildChart(state, trades) {
+async function liveBuildChart(state, trades, opts) {
   const symbol = (document.getElementById("live-symbol").value || "BTC").trim().toUpperCase();
   const canvas  = document.getElementById("live-price-canvas");
   if (!canvas) return;
 
-  // Update header label
-  const hdr = canvas.closest(".bg-gray-900")?.querySelector("span.text-gray-400");
-  if (hdr) hdr.innerHTML =
-    `${symbol}/USDT · 15m &nbsp;·&nbsp;<span class="text-indigo-400">BB(20, 3.0)</span> &nbsp;·&nbsp;<span class="text-yellow-400">EMA-150</span>`;
+  // Resolve the from/to to request:
+  //  - opts.fromMs/toMs (explicit — user clicked Apply)
+  //  - else the currently-applied range, re-liveified (to bumped to "now" if
+  //    it was tracking today) — keeps periodic refreshes on a symbol change
+  //    from silently discarding a range the user picked
+  //  - else nothing — first-ever load, let the server pick the default
+  let fromMs = opts?.fromMs, toMs = opts?.toMs;
+  if (fromMs == null && _liveChartFromMs != null) {
+    fromMs = _liveChartFromMs;
+    toMs   = _liveRangeIsLive(_liveChartToMs) ? Date.now() : _liveChartToMs;
+  }
+
+  let url = `/api/live_chart?symbol=${encodeURIComponent(symbol)}`;
+  if (fromMs != null && toMs != null) {
+    url += `&from=${encodeURIComponent(new Date(fromMs).toISOString())}`;
+    url += `&to=${encodeURIComponent(new Date(toMs).toISOString())}`;
+  }
 
   let chartData;
   try {
-    const res = await fetch(`/api/live_chart?symbol=${encodeURIComponent(symbol)}`);
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     chartData = await res.json();
   } catch (e) {
@@ -2225,8 +2294,21 @@ async function liveBuildChart(state, trades) {
     return;
   }
 
-  const { candles = [], bb_upper = [], bb_mid = [], bb_lower = [], ema = [], now_ms, display_ms } = chartData;
+  const { candles = [], bb_upper = [], bb_mid = [], bb_lower = [], ema = [], timeframe, from_ms, to_ms } = chartData;
   if (!candles.length) return;
+
+  // Remember the resolved range so the next refresh/rebuild (symbol change,
+  // periodic tick) reuses it instead of falling back to the default, and
+  // reflect it back into the date inputs so they show what's actually drawn.
+  _liveChartFromMs = from_ms;
+  _liveChartToMs   = to_ms;
+  document.getElementById("live-chart-from").value = _liveMsToDateInputValue(from_ms);
+  document.getElementById("live-chart-to").value   = _liveMsToDateInputValue(to_ms);
+
+  // Update header label
+  const hdr = document.getElementById("live-chart-hdr");
+  if (hdr) hdr.innerHTML =
+    `${symbol}/USDT · ${(timeframe || "15m").toUpperCase()} &nbsp;·&nbsp;<span class="text-indigo-400">BB(20, 3.0)</span> &nbsp;·&nbsp;<span class="text-yellow-400">EMA-150</span>`;
 
   // ── Build datasets ──────────────────────────────────────────
   const ohlcData    = candles.map(c => ({ x: c[0], o: c[1], h: c[2], l: c[3], c: c[4] }));
@@ -2236,7 +2318,11 @@ async function liveBuildChart(state, trades) {
   const emaData     = candles.map((c, i) => ema[i]       != null ? { x: c[0], y: ema[i]       } : null).filter(Boolean);
 
   // ── B/S markers from closed trades ──────────────────────────
-  const sz = 22;
+  // Points are plotted by real timestamp on a continuous time axis (not by
+  // candle index), so they stay correctly positioned automatically whenever
+  // the underlying candle resolution changes — only the marker *size* needs
+  // to adapt so it stays proportional to the visible span.
+  const sz = _liveMarkerRadius(to_ms - from_ms) * 2;
   const buyImg  = makeLetterMarker("B", "#5fa876", sz);
   const sellImg = makeLetterMarker("S", "#d9736b", sz);
   const openImg = makeLetterMarker("B", "#8a8577", sz);
@@ -2265,8 +2351,12 @@ async function liveBuildChart(state, trades) {
   }
 
   // ── Annotation lines ─────────────────────────────────────────
+  // Only draw the live position's lines if "now" actually falls inside the
+  // displayed window — a historical range shouldn't show today's open
+  // position as if it were relevant to those older candles.
+  const nowInRange = Date.now() >= from_ms && Date.now() <= to_ms;
   const annotations = {};
-  if (state && state.phase === "in_position") {
+  if (nowInRange && state && state.phase === "in_position") {
     if (state.pos_entry) annotations.entry = {
       type: "line", scaleID: "y", value: state.pos_entry,
       borderColor: "#6b8fae", borderWidth: 1, borderDash: [4, 4],
@@ -2289,16 +2379,12 @@ async function liveBuildChart(state, trades) {
     };
   }
 
-  // ── Default x window: server-computed, see /api/live_chart ──
-  const xMax  = now_ms;
-  const xMin  = now_ms - display_ms;
-  const xUnit = _indTimeUnit(xMin, xMax);   // reuse shared helper → "hour" for 7 days
+  // ── x window: exactly the resolved from/to, no zoom/pan involved ──
+  const xMax  = to_ms;
+  const xMin  = from_ms;
+  const xUnit = _indTimeUnit(xMin, xMax);
 
-  // ── Destroy old chart + remove old wheel listener ────────────
-  if (_livePriceWheelHandler) {
-    canvas.removeEventListener("wheel", _livePriceWheelHandler);
-    _livePriceWheelHandler = null;
-  }
+  // ── Destroy old chart ─────────────────────────────────────────
   if (livePriceChart) { livePriceChart.destroy(); livePriceChart = null; }
   _livePriceSymbol = symbol;
 
@@ -2386,24 +2472,6 @@ async function liveBuildChart(state, trades) {
             },
           },
         },
-        // Ctrl+scroll = zoom only; plain scroll handled manually below
-        zoom: {
-          pan:  { enabled: true, mode: "x",
-                  onPan: ({ chart: ch }) => {
-                    const sc = ch.options.scales.x;
-                    const unit = _indTimeUnit(sc.min, sc.max);
-                    if (sc.time?.unit !== unit) { sc.time = Object.assign({}, sc.time, { unit }); ch.update("none"); }
-                  }
-                },
-          zoom: { wheel: { enabled: true, modifierKey: "ctrl" }, pinch: { enabled: true }, mode: "x",
-                  onZoom: ({ chart: ch }) => {
-                    const sc = ch.options.scales.x;
-                    const unit = _indTimeUnit(sc.min, sc.max);
-                    if (sc.time?.unit !== unit) { sc.time = Object.assign({}, sc.time, { unit }); ch.update("none"); }
-                  }
-                },
-          limits: { x: { min: "original", max: "original" } },
-        },
         annotation: { annotations },
       },
       scales: {
@@ -2428,25 +2496,6 @@ async function liveBuildChart(state, trades) {
     },
   });
 
-  // ── Manual wheel handler ──────────────────────────────────────
-  // Horizontal scroll (trackpad swipe left/right or deltaX) → pan chart x-axis
-  // Vertical scroll without Ctrl                             → let the page scroll
-  // Ctrl + scroll                                            → zoom plugin takes over
-  _livePriceWheelHandler = (e) => {
-    if (e.ctrlKey || e.metaKey) return; // let zoom plugin handle it
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.deltaX !== 0) {
-      // Horizontal component dominant → pan chart
-      e.preventDefault();
-      const delta = e.deltaX * 2;
-      try { livePriceChart.pan({ x: -delta }, undefined, "default"); } catch (_) {}
-      // Update time unit after pan
-      const sc = livePriceChart.options.scales.x;
-      const unit = _indTimeUnit(sc.min, sc.max);
-      if (sc.time?.unit !== unit) { sc.time = Object.assign({}, sc.time, { unit }); livePriceChart.update("none"); }
-    }
-    // Vertical → do nothing special, browser scrolls the page
-  };
-  canvas.addEventListener("wheel", _livePriceWheelHandler, { passive: false });
 }
 
 async function liveRefresh() {
@@ -2484,6 +2533,8 @@ async function liveRefresh() {
 
 function liveRender(data) {
   const { state = {}, stats = {}, trades = [], equity = [], mode, symbol } = data;
+  _liveLastState  = state;
+  _liveLastTrades = trades;
 
   /* ── Mode + phase badges ── */
   const modeBadge = document.getElementById("live-mode-badge");
