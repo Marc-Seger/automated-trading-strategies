@@ -647,7 +647,9 @@ def api_live_chart():
     """
     Return 15m OHLCV + BB(20,3.0) + EMA(150) for the live bot price chart.
     Uses the same gap-filling indicator cache as the indicator backtest tab.
-    Always returns warmup + 7 display days so indicators are fully seeded.
+    Default display window spans the candle before the earliest of the last 5
+    trades through now (1 day minimum if no trades exist yet); warmup candles
+    are fetched on top so indicators are fully seeded.
 
     Query params:
       symbol — symbol_key from config (default "BTC")
@@ -660,7 +662,29 @@ def api_live_chart():
     ccxt_sym   = f"{symbol_key}/USDT"          # cache key format (spot-style)
 
     now_ms      = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
-    display_ms  = 7 * 24 * 3600 * 1000         # 7 days to show by default
+    CANDLE_MS   = 900_000  # 15m
+
+    # Default window: candle before the open of the earliest of the last 5 trades
+    # (open or closed) through the live candle. Falls back to 1 day if no trades yet.
+    trades_path = os.path.join(BASE_DIR, "data", "trades", f"bb_bot_trades_{symbol_key}.json")
+    trades = []
+    if os.path.exists(trades_path):
+        try:
+            with open(trades_path) as f:
+                trades = json.load(f)
+        except Exception:
+            trades = []
+
+    last5 = sorted(
+        (t for t in trades if t.get("entry_ts")),
+        key=lambda t: t["entry_ts"],
+    )[-5:]
+    if last5:
+        earliest_entry_ms = min(t["entry_ts"] for t in last5)
+        display_ms = now_ms - (earliest_entry_ms - CANDLE_MS)
+    else:
+        display_ms = 24 * 3600 * 1000   # 1 day minimum when no trades exist yet
+
     warmup_ms   = max(BB_PERIOD, TREND_PERIOD) * 900_000   # candles needed to seed indicators
     fetch_from  = now_ms - display_ms - warmup_ms * 3      # generous extra buffer
 

@@ -1130,6 +1130,7 @@ function closeModal() {
   backdrop.classList.add("hidden");
   backdrop.classList.remove("flex");
   if (modalOhlcvChart) { modalOhlcvChart.destroy(); modalOhlcvChart = null; }
+  if (liveModalChart)  { try { liveModalChart.destroy(); } catch(e){} liveModalChart = null; }
 }
 
 function fmtCandleLabel(ms) {
@@ -1160,6 +1161,8 @@ let liveEquityChart      = null;
 let livePriceChart       = null;
 let _livePriceSymbol     = null;   // symbol the chart was built for
 let _livePriceLastCandle = null;   // ts of last candle — detect new data
+let _liveTradesForModal  = [];     // closed trades shown in the table, indexed for the detail modal
+let liveModalChart        = null;  // Chart.js instance for the live trade detail modal
 
 function showDoc(id) {
   document.querySelectorAll(".doc-section").forEach(el => el.classList.add("hidden"));
@@ -1213,6 +1216,7 @@ let indPerTradeMode  = "flat";  // "flat" | "pct"
 let indDisplayedTrades = [];    // trades currently shown in table (for modal click)
 let indLastData      = null;    // last full API response, used to re-render on mode toggle
 let indLastTimeframe = "1h";    // timeframe of last simulation run
+let modalOhlcvChart  = null;    // Chart.js instance for the Backtest tab's per-trade modal chart
 
 
 function setIndEquityMode(mode) {
@@ -2173,7 +2177,7 @@ async function liveBuildChart(state, trades) {
   const emaData     = candles.map((c, i) => ema[i]       != null ? { x: c[0], y: ema[i]       } : null).filter(Boolean);
 
   // ── B/S markers from closed trades ──────────────────────────
-  const sz = 16;
+  const sz = 22;
   const buyImg  = makeLetterMarker("B", "#10b981", sz);
   const sellImg = makeLetterMarker("S", "#ef4444", sz);
   const openImg = makeLetterMarker("B", "#6b7280", sz);
@@ -2187,17 +2191,18 @@ async function liveBuildChart(state, trades) {
     const exitTs  = t.exit_ts;
     const dir     = t.direction;
     if (!entryTs) return;
-    if (dir === "long")  buyPoints.push({ x: entryTs, y: t.entry });
-    else                 sellPoints.push({ x: entryTs, y: t.entry });
+    // _t carries the full trade record through to the tooltip callback below
+    if (dir === "long")  buyPoints.push({ x: entryTs, y: t.entry, _t: t });
+    else                 sellPoints.push({ x: entryTs, y: t.entry, _t: t });
     if (exitTs && t.exit) {
-      if (dir === "long") sellPoints.push({ x: exitTs, y: t.exit });
-      else                buyPoints.push({ x: exitTs, y: t.exit });
+      if (dir === "long") sellPoints.push({ x: exitTs, y: t.exit, _t: t });
+      else                buyPoints.push({ x: exitTs, y: t.exit, _t: t });
     }
   });
 
   // Grey "B" for the open position entry (not yet closed)
   if (state && state.phase === "in_position" && state.pos_entry_ts) {
-    openPoints.push({ x: state.pos_entry_ts, y: state.pos_entry });
+    openPoints.push({ x: state.pos_entry_ts, y: state.pos_entry, _t: state });
   }
 
   // ── Annotation lines ─────────────────────────────────────────
@@ -2225,7 +2230,7 @@ async function liveBuildChart(state, trades) {
     };
   }
 
-  // ── Default x window: last 7 days ───────────────────────────
+  // ── Default x window: server-computed, see /api/live_chart ──
   const xMax  = now_ms;
   const xMin  = now_ms - display_ms;
   const xUnit = _indTimeUnit(xMin, xMax);   // reuse shared helper → "hour" for 7 days
@@ -2265,11 +2270,60 @@ async function liveBuildChart(state, trades) {
         legend: { display: false },
         tooltip: {
           filter: item => item.dataset.label !== "BB Mid",
+          displayColors: false,
+          padding: 10,
           callbacks: {
+            title: ctx => (ctx[0]?.dataset.label === "Buy" || ctx[0]?.dataset.label === "Sell" || ctx[0]?.dataset.label === "Open") ? "" : undefined,
             label: ctx => {
               const l = ctx.dataset.label;
               if (l === "Price") { const r = ctx.raw; return `O:${r.o.toFixed(1)} H:${r.h.toFixed(1)} L:${r.l.toFixed(1)} C:${r.c.toFixed(1)}`; }
+              if (l === "Buy" || l === "Sell" || l === "Open") return ""; // rendered via afterBody instead
               return `${l}: ${ctx.parsed.y?.toFixed(1) ?? ""}`;
+            },
+            afterBody: items => {
+              const item = items[0];
+              if (!item) return [];
+              const l = item.dataset.label;
+              if (l !== "Buy" && l !== "Sell" && l !== "Open") return [];
+              const t = item.raw?._t;
+              if (!t) return [];
+
+              const fmtDate = ms => {
+                if (!ms) return "—";
+                const d = new Date(ms);
+                const p = n => String(n).padStart(2, "0");
+                return `${p(d.getUTCDate())}/${p(d.getUTCMonth()+1)}/${d.getUTCFullYear()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
+              };
+              const fmtN = v => v != null ? Number(v).toFixed(1) : "—";
+              const dir = (t.direction || t.pos_direction) === "short" ? "Short" : "Long";
+
+              // A "Buy"/"Sell" dataset can hold either side of a trade depending on
+              // direction (e.g. a short's entry lands in "Sell", its exit in "Buy") —
+              // compare the point's own timestamp against the trade's entry_ts to
+              // disambiguate, rather than trusting the dataset label alone.
+              const pointTs  = item.raw?.x;
+              const entryTs0 = t.entry_ts ?? t.pos_entry_ts;
+              const isEntry  = l === "Open" || pointTs === entryTs0;
+              if (isEntry) {
+                const entryTs = t.entry_ts ?? t.pos_entry_ts;
+                const entryPx = t.entry ?? t.pos_entry;
+                const lines = [`Date: ${fmtDate(entryTs)}`, `Open ${dir}: 10X`, `Entry: ${fmtN(entryPx)}`];
+                if (l === "Open") lines.push("Status: Open (unresolved)");
+                return lines;
+              } else {
+                const exitTs = t.exit_ts;
+                const exitPx = t.exit;
+                const won    = (t.pnl_usdt ?? 0) >= 0;
+                const pnlPct = t.pnl_pct != null ? `${t.pnl_pct >= 0 ? "+" : ""}${Number(t.pnl_pct).toFixed(2)}%` : "—";
+                const pnlUsd = t.pnl_usdt != null ? ` (${t.pnl_usdt >= 0 ? "+" : ""}$${Number(t.pnl_usdt).toFixed(2)})` : "";
+                return [
+                  `Date: ${fmtDate(exitTs)}`,
+                  `Close ${dir}: ${won ? "Win" : "Loss"}`,
+                  `Reason: ${t.reason || "—"}`,
+                  `Close price: ${fmtN(exitPx)}`,
+                  `P&L: ${pnlPct}${pnlUsd}`,
+                ];
+              }
             },
           },
         },
@@ -2298,7 +2352,7 @@ async function liveBuildChart(state, trades) {
           type: "time",
           min: xMin,
           max: xMax,
-          time: { tooltipFormat: "yyyy-MM-dd HH:mm UTC", unit: xUnit },
+          time: { tooltipFormat: "yyyy-MM-dd HH:mm 'UTC'", unit: xUnit },
           ticks: {
             color: "#6b7280",
             maxTicksLimit: 8,
@@ -2432,10 +2486,11 @@ function liveRender(data) {
   /* ── Trade table ── */
   const tbody = document.getElementById("live-trade-tbody");
   const closed = trades.filter(t => t.reason !== "open").reverse(); // newest first
+  _liveTradesForModal = closed; // rows reference this by index for the detail modal
   if (!closed.length) {
     tbody.innerHTML = `<tr><td colspan="9" class="px-3 py-6 text-center text-gray-600">No closed trades yet</td></tr>`;
   } else {
-    tbody.innerHTML = closed.map(t => {
+    tbody.innerHTML = closed.map((t, i) => {
       const pnlPos  = (t.pnl_usdt ?? 0) >= 0;
       const pnlCls  = pnlPos ? "text-green-400" : "text-red-400";
       const dirCls  = t.direction === "long" ? "text-green-400" : "text-red-400";
@@ -2451,7 +2506,7 @@ function liveRender(data) {
       const entryTs = t.entry_ts || t.pos_entry_ts || null;
       const exitTs  = t.exit_ts  || null;
 
-      return `<tr class="border-b border-gray-800 hover:bg-gray-800/50">
+      return `<tr class="border-b border-gray-800 hover:bg-gray-800/50 cursor-pointer" onclick="openLiveTradeModal(${i})">
         <td class="px-3 py-2 text-gray-400">${fmtTs(entryTs)}</td>
         <td class="px-3 py-2 text-center font-semibold ${dirCls}">${(t.direction||"").toUpperCase()}</td>
         <td class="px-3 py-2 text-right text-white">$${fmt(t.entry)}</td>
@@ -2526,6 +2581,130 @@ function liveRender(data) {
       },
     },
   });
+}
+
+/* ── Live trade detail modal ─────────────────────────────────────
+   Reuses the shared #modal-backdrop/#modal-content used by the
+   Backtest tab's per-trade modal (see openIndModal above). */
+const LIVE_LEVERAGE = 10; // BB Channel Rider spec: fixed 10x, not stored per-trade
+
+function openLiveTradeModal(i) {
+  const trade = _liveTradesForModal[i];
+  if (!trade) return;
+
+  const backdrop = document.getElementById("modal-backdrop");
+  const content  = document.getElementById("modal-content");
+  const pnlPos   = (trade.pnl_usdt ?? 0) >= 0;
+  const pnlCls   = pnlPos ? "text-emerald-400" : "text-red-400";
+
+  // Margin (capital actually committed to this trade) backs out from the
+  // contract-sizing formula in STRATEGY_SPEC.md: quantity = capital*0.25 / (entry*0.0001),
+  // so margin = quantity * entry * 0.0001 / leverage.
+  const margin = trade.quantity != null && trade.entry != null
+    ? (trade.quantity * trade.entry * 0.0001) / LIVE_LEVERAGE
+    : null;
+  const capitalBefore = trade.capital != null && trade.pnl_usdt != null
+    ? trade.capital - trade.pnl_usdt
+    : null;
+
+  const fmtDT = ms => {
+    if (!ms) return "—";
+    const d = new Date(ms);
+    const p = n => String(n).padStart(2, "0");
+    return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
+  };
+  const durH = trade.entry_ts && trade.exit_ts ? (trade.exit_ts - trade.entry_ts) / 3_600_000 : null;
+
+  content.innerHTML = `
+    <h2 class="text-lg font-bold text-indigo-300 mb-1">${trade.symbol || "BTC"} — Live Bot Trade</h2>
+    <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-sm mb-4">
+      <div><span class="text-gray-400">Direction:</span> ${dirBadge(trade.direction)}</div>
+      <div><span class="text-gray-400">Entry date:</span> <span class="text-white">${fmtDT(trade.entry_ts)}</span></div>
+      <div><span class="text-gray-400">Reason:</span> <span class="${trade.reason === "TP" ? "text-emerald-400" : "text-red-400"} font-semibold">${trade.reason || "—"}</span></div>
+      <div><span class="text-gray-400">Exit date:</span> <span class="text-white">${fmtDT(trade.exit_ts)}</span></div>
+      <div><span class="text-gray-400">P&amp;L:</span> <span class="${pnlCls} font-bold">${trade.pnl_pct != null ? (trade.pnl_pct >= 0 ? "+" : "") + trade.pnl_pct.toFixed(2) + "%" : "—"}</span></div>
+      <div><span class="text-gray-400">P&amp;L $:</span> <span class="${pnlCls} font-bold">${trade.pnl_usdt != null ? (pnlPos ? "+" : "") + "$" + trade.pnl_usdt.toFixed(2) : "—"}</span></div>
+      <div><span class="text-gray-400">Leverage:</span> ${LIVE_LEVERAGE}x</div>
+      <div><span class="text-gray-400">Capital used (margin):</span> ${margin != null ? "$" + margin.toFixed(2) : "—"}</div>
+      <div><span class="text-gray-400">Entry price:</span> ${fmtPrice(trade.entry)}</div>
+      <div><span class="text-gray-400">Exit price:</span> ${fmtPrice(trade.exit)}</div>
+      <div><span class="text-gray-400">Quantity:</span> ${trade.quantity ?? "—"} contracts</div>
+      <div><span class="text-gray-400">Duration:</span> ${durH != null ? durH.toFixed(1) + "h" : "—"}</div>
+      <div><span class="text-gray-400">Capital before:</span> ${capitalBefore != null ? "$" + capitalBefore.toFixed(2) : "—"}</div>
+      <div><span class="text-gray-400">Capital after:</span> ${trade.capital != null ? "$" + trade.capital.toFixed(2) : "—"}</div>
+    </div>
+    <div style="height:220px"><canvas id="modal-chart"></canvas></div>
+  `;
+
+  backdrop.classList.remove("hidden");
+  backdrop.classList.add("flex");
+  fetchAndRenderLiveModalChart(trade);
+}
+
+async function fetchAndRenderLiveModalChart(trade) {
+  const entryMs = trade.entry_ts;
+  const exitMs  = trade.exit_ts || entryMs;
+  const spanMs  = Math.max(exitMs - entryMs, 3_600_000);
+  const padMs   = spanMs * 0.15;
+  const fromMs  = entryMs - padMs;
+  const toMs    = exitMs + padMs;
+
+  const sym = trade.symbol || "BTC";
+  const url = `/api/ind_ohlcv?symbol=${encodeURIComponent(sym)}&timeframe=15m`
+    + `&from=${new Date(fromMs).toISOString()}&to=${new Date(toMs).toISOString()}`;
+
+  let candles = [];
+  try { candles = await fetch(url).then(r => r.json()); } catch (e) {}
+
+  if (!candles.length) {
+    const el = document.getElementById("modal-chart");
+    if (el) el.parentElement.innerHTML =
+      `<p class="text-center text-gray-500 text-sm py-8">No OHLCV data available.</p>`;
+    return;
+  }
+
+  const labels = candles.map(c => fmtCandleLabel(c.t));
+  const closes = candles.map(c => c.c);
+
+  const annotations = {};
+  if (trade.entry != null) {
+    annotations.entry = {
+      type: "point", xValue: closestLabel(candles, labels, entryMs), yValue: trade.entry,
+      radius: 7, backgroundColor: "rgba(16,185,129,0.95)", borderColor: "#fff", borderWidth: 1,
+      label: { content: "B", display: true, color: "#fff", font: { size: 9, weight: "bold" }, position: "center" },
+    };
+  }
+  if (trade.exit != null && trade.exit_ts) {
+    annotations.exit = {
+      type: "point", xValue: closestLabel(candles, labels, exitMs), yValue: trade.exit,
+      radius: 7, backgroundColor: "rgba(239,68,68,0.95)", borderColor: "#fff", borderWidth: 1,
+      label: { content: "S", display: true, color: "#fff", font: { size: 9, weight: "bold" }, position: "center" },
+    };
+  }
+
+  if (liveModalChart) { try { liveModalChart.destroy(); } catch (e) {} liveModalChart = null; }
+  const ctx = document.getElementById("modal-chart");
+  if (!ctx) return;
+  try {
+    liveModalChart = new Chart(ctx, {
+      type: "line",
+      data: { labels, datasets: [{ data: closes,
+        borderColor: "rgba(148,163,184,0.9)", backgroundColor: "rgba(148,163,184,0.06)",
+        borderWidth: 1.5, pointRadius: 0, tension: 0.1, fill: true }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { display: false }, annotation: { annotations } },
+        scales: {
+          x: { ticks: { color: "#6b7280", font: { size: 9 }, maxTicksLimit: 7 }, grid: { color: "rgba(255,255,255,0.04)" } },
+          y: { ticks: { color: "#6b7280", font: { size: 9 }, callback: v => fmtPrice(v) }, grid: { color: "rgba(255,255,255,0.04)" } },
+        },
+      },
+    });
+  } catch (e) {
+    const el = document.getElementById("modal-chart");
+    if (el) el.parentElement.innerHTML =
+      `<p class="text-center text-red-400 text-sm py-8">Chart error: ${e.message}</p>`;
+  }
 }
 </script>
 </body>
