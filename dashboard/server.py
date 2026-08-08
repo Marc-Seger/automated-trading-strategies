@@ -687,12 +687,27 @@ def api_live_chart():
     from_param = request.args.get("from")
     to_param   = request.args.get("to")
 
+    resolution_span_ms = None
     if from_param and to_param:
         try:
             from_ms = int(datetime.fromisoformat(from_param.replace("Z", "+00:00")).timestamp() * 1000)
             to_ms   = int(datetime.fromisoformat(to_param.replace("Z", "+00:00")).timestamp() * 1000)
         except ValueError:
             return jsonify({"error": "from/to must be ISO date or datetime strings"}), 400
+
+        # The frontend sends whole calendar days: from = start of the From day,
+        # to = end of the To day (23:59:59.999) so that day's candles are fully
+        # covered. Using that raw span to pick a resolution over-counts by up to
+        # a full day (picking, say, the same single day for both From and To
+        # already spans nearly 24h once "to" is end-of-day, and adjacent days
+        # span nearly 48h) — floor both to their own day start first so "From
+        # Monday to Tuesday" reads as the 1-day gap a user actually picked, not
+        # ~2 days.
+        def _floor_to_day(ms):
+            d = datetime.fromtimestamp(ms / 1000, tz=timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0)
+            return int(d.timestamp() * 1000)
+        resolution_span_ms = _floor_to_day(to_ms) - _floor_to_day(from_ms)
     else:
         # Default window: candle before the open of the earliest of the last 5
         # trades (open or closed) through the live candle. Falls back to 1 day
@@ -720,7 +735,7 @@ def api_live_chart():
     if to_ms <= from_ms:
         return jsonify({"error": "to must be after from"}), 400
 
-    timeframe = _timeframe_for_span(to_ms - from_ms)
+    timeframe = _timeframe_for_span(resolution_span_ms if resolution_span_ms is not None else to_ms - from_ms)
     candle_ms = _TF_MS[timeframe]
 
     warmup_ms  = max(BB_PERIOD, TREND_PERIOD) * candle_ms   # candles needed to seed indicators

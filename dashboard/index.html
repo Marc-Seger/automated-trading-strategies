@@ -2216,6 +2216,22 @@ function _liveMarkerRadius(spanMs) {
   return 5;
 }
 
+// Candles are drawn as thin bars at their own open timestamp, not stretched
+// across their full interval — so a marker plotted at its *exact* trade
+// timestamp can end up in the visual gap between two candles instead of on
+// the one that actually contains it. Snapping the marker's x to its
+// containing candle's own timestamp keeps it visually pinned to a real
+// candle at every resolution; `candles` is sorted ascending by open time.
+function _snapTsToCandleOpen(candles, ts) {
+  if (!candles.length) return ts;
+  if (ts < candles[0][0]) return candles[0][0];
+  for (let i = 0; i < candles.length; i++) {
+    const next = candles[i + 1];
+    if (!next || next[0] > ts) return candles[i][0];
+  }
+  return candles[candles.length - 1][0];
+}
+
 function liveApplyDateRange() {
   const fromMs = _liveDateInputToMs(document.getElementById("live-chart-from"), false);
   const toMs   = _liveDateInputToMs(document.getElementById("live-chart-to"), true);
@@ -2318,10 +2334,14 @@ async function liveBuildChart(state, trades, opts) {
   const emaData     = candles.map((c, i) => ema[i]       != null ? { x: c[0], y: ema[i]       } : null).filter(Boolean);
 
   // ── B/S markers from closed trades ──────────────────────────
-  // Points are plotted by real timestamp on a continuous time axis (not by
-  // candle index), so they stay correctly positioned automatically whenever
-  // the underlying candle resolution changes — only the marker *size* needs
-  // to adapt so it stays proportional to the visible span.
+  // x is snapped to the containing candle's own open timestamp (see
+  // _snapTsToCandleOpen) so markers always sit on a real candle instead of
+  // floating at their exact sub-candle timestamp — recomputed on every
+  // build, so a resolution change (different candles) always re-snaps
+  // correctly. The tooltip still shows the trade's real, unsnapped time via
+  // _t; disambiguating entry vs exit uses an explicit _isEntry flag rather
+  // than comparing x back to entry_ts, since snapping can make two
+  // timestamps land on the same candle.
   const sz = _liveMarkerRadius(to_ms - from_ms) * 2;
   const buyImg  = makeLetterMarker("B", "#5fa876", sz);
   const sellImg = makeLetterMarker("S", "#d9736b", sz);
@@ -2336,18 +2356,20 @@ async function liveBuildChart(state, trades, opts) {
     const exitTs  = t.exit_ts;
     const dir     = t.direction;
     if (!entryTs) return;
-    // _t carries the full trade record through to the tooltip callback below
-    if (dir === "long")  buyPoints.push({ x: entryTs, y: t.entry, _t: t });
-    else                 sellPoints.push({ x: entryTs, y: t.entry, _t: t });
+    const entryX = _snapTsToCandleOpen(candles, entryTs);
+    if (dir === "long")  buyPoints.push({ x: entryX, y: t.entry, _t: t, _isEntry: true });
+    else                 sellPoints.push({ x: entryX, y: t.entry, _t: t, _isEntry: true });
     if (exitTs && t.exit) {
-      if (dir === "long") sellPoints.push({ x: exitTs, y: t.exit, _t: t });
-      else                buyPoints.push({ x: exitTs, y: t.exit, _t: t });
+      const exitX = _snapTsToCandleOpen(candles, exitTs);
+      if (dir === "long") sellPoints.push({ x: exitX, y: t.exit, _t: t, _isEntry: false });
+      else                buyPoints.push({ x: exitX, y: t.exit, _t: t, _isEntry: false });
     }
   });
 
   // Grey "B" for the open position entry (not yet closed)
   if (state && state.phase === "in_position" && state.pos_entry_ts) {
-    openPoints.push({ x: state.pos_entry_ts, y: state.pos_entry, _t: state });
+    const openX = _snapTsToCandleOpen(candles, state.pos_entry_ts);
+    openPoints.push({ x: openX, y: state.pos_entry, _t: state, _isEntry: true });
   }
 
   // ── Annotation lines ─────────────────────────────────────────
@@ -2444,11 +2466,10 @@ async function liveBuildChart(state, trades, opts) {
 
               // A "Buy"/"Sell" dataset can hold either side of a trade depending on
               // direction (e.g. a short's entry lands in "Sell", its exit in "Buy") —
-              // compare the point's own timestamp against the trade's entry_ts to
-              // disambiguate, rather than trusting the dataset label alone.
-              const pointTs  = item.raw?.x;
-              const entryTs0 = t.entry_ts ?? t.pos_entry_ts;
-              const isEntry  = l === "Open" || pointTs === entryTs0;
+              // use the point's own _isEntry flag to disambiguate rather than
+              // comparing timestamps, since entry/exit markers can share an x
+              // value once snapped to the same containing candle.
+              const isEntry  = l === "Open" || item.raw?._isEntry === true;
               if (isEntry) {
                 const entryTs = t.entry_ts ?? t.pos_entry_ts;
                 const entryPx = t.entry ?? t.pos_entry;
