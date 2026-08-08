@@ -281,10 +281,18 @@ class BBBot:
         )
 
         # ccxt.pro exchange — WebSocket + REST (superset of ccxt)
+        # newUpdates=False: watch_ohlcv() must return the full rolling window
+        # (up to `limit`) on every call, not just the delta since the last
+        # call. MEXC's swap kline stream pushes one tick at a time, so with
+        # the ccxt.pro default (newUpdates=True) the delta is almost always
+        # exactly 1 candle — meaning the close-detection branch below never
+        # sees candles[-2] (the newly-closed candle) and silently discards
+        # every candle close, forever. Confirmed live 2026-08-08.
         self.ws_exchange = ccxtpro.mexc({
             "apiKey": os.getenv("MEXC_API_KEY",    ""),
             "secret": os.getenv("MEXC_API_SECRET", ""),
             "options": {"defaultType": "swap"},
+            "newUpdates": False,
         })
 
         self.state   = load_state(self.symbol_key)
