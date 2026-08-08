@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BTC Engine — Live Bot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f2ee; color: #1c1a17; font-family: 'Manrope', sans-serif; }
+  a { color: inherit; text-decoration: none; }
+  .app { width: 100%; height: 100vh; padding: 16px 20px; display: flex; flex-direction: column; overflow: hidden; }
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 0 8px; flex-shrink: 0; }
+  .nav-tabs { display: flex; gap: 6px; background: #e9e6de; padding: 5px; border-radius: 100px; }
+  .nav-tab { padding: 8px 18px; font-size: 13px; font-weight: 600; color: #7a7568; border-radius: 100px; }
+  .nav-tab.active { font-weight: 700; color: white; background: #1c1a17; }
+  .btn-refresh { background: white; border: 1px solid #e2ded3; padding: 10px 20px; border-radius: 100px; font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 13px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: auto 1fr auto; gap: 12px; flex: 1; min-height: 0; }
+  .card { background: white; border-radius: 18px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; color: #a29c8c; margin-bottom: 8px; }
+  .pill { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700; padding: 5px 10px; border-radius: 100px; }
+  .chart-card, .equity-card, .trades-card { display: flex; flex-direction: column; min-height: 0; }
+  .card-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0; }
+  .btn-ghost { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #a29c8c; border: 1px solid #e2ded3; padding: 5px 10px; border-radius: 100px; cursor: pointer; }
+  table.trades { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  table.trades th { text-align: left; padding: 6px 0; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.04em; color: #a29c8c; font-weight: 500; border-bottom: 1px solid #efece4; }
+  table.trades td { padding: 8px 0; border-bottom: 1px solid #f5f3ee; }
+  table.trades tr:last-child td { border-bottom: none; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div style="display:flex; align-items:center; gap:28px;">
+      <div style="font-weight:800; font-size:19px; letter-spacing:-0.01em;">BTC Engine</div>
+      <div class="nav-tabs">
+        <span class="nav-tab">Backtest</span>
+        <span class="nav-tab">Docs</span>
+        <span class="nav-tab active">Live Bot</span>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <span class="mono" style="font-size:12px; color:#8a8577; display:flex; align-items:center; gap:6px;"><span style="width:6px;height:6px;border-radius:50%;background:#5fa876;"></span>15:12:58 UTC</span>
+      <button class="btn-refresh">Refresh</button>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <div class="card" style="grid-column:span 3; display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
+      <div>
+        <div class="label">SYMBOL</div>
+        <div style="font-size:24px; font-weight:800; letter-spacing:-0.02em;">BTC</div>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <span class="pill" style="background:#f3e6cf; color:#a5732a;">PAPER</span>
+        <span class="pill" style="background:#efece4; color:#7a7568;">IDLE</span>
+      </div>
+    </div>
+
+    <div class="card" style="grid-column:span 3; background:#1c1a17; color:#f4f2ee; display:flex; flex-direction:column; justify-content:space-between;">
+      <div class="label" style="color:#a29c8c;">WIN RATE</div>
+      <div style="font-size:32px; font-weight:800; letter-spacing:-0.02em; color:#a4d9a5;">100.0%</div>
+      <div style="font-size:11px; color:#8a8577;">3 of 3 trades &middot; +$78.71</div>
+    </div>
+
+    <div class="card" style="grid-column:span 3;">
+      <div class="label">TOTAL P&amp;L</div>
+      <div style="font-size:26px; font-weight:800; color:#4f8f5c; letter-spacing:-0.02em;">+$78.71</div>
+      <div style="font-size:11px; color:#a29c8c; margin-top:4px;">avg win +$26.24</div>
+    </div>
+
+    <div class="card" style="grid-column:span 3;">
+      <div class="label">CAPITAL</div>
+      <div style="font-size:26px; font-weight:800; letter-spacing:-0.02em;">$1,078.71</div>
+      <div style="font-size:11px; color:#a29c8c; margin-top:4px;">avg loss &mdash; &middot; max DD &mdash;</div>
+    </div>
+
+    <div class="card chart-card" style="grid-column:span 8;">
+      <div class="card-title-row">
+        <div style="font-size:14px; font-weight:700;">BTC/USDT <span style="color:#a29c8c; font-weight:500; font-size:12px;">&middot; 15M &middot; BB(20,3.0) &middot; EMA-150</span></div>
+        <span class="btn-ghost">Reset Zoom</span>
+      </div>
+      <svg viewBox="0 0 1000 340" preserveAspectRatio="none" style="width:100%; height:100%; min-height:0; display:block; overflow:visible;">
+        <g stroke="#efece4" stroke-width="1">
+          <line x1="0" y1="0" x2="1000" y2="0"></line>
+          <line x1="0" y1="60" x2="1000" y2="60"></line>
+          <line x1="0" y1="120" x2="1000" y2="120"></line>
+          <line x1="0" y1="180" x2="1000" y2="180"></line>
+          <line x1="0" y1="240" x2="1000" y2="240"></line>
+          <line x1="0" y1="300" x2="1000" y2="300"></line>
+        </g>
+        <text x="0" y="6" fill="#a29c8c" font-family="IBM Plex Mono" font-size="10">66.0k</text>
+        <text x="0" y="66" fill="#a29c8c" font-family="IBM Plex Mono" font-size="10">65.0k</text>
+        <text x="0" y="126" fill="#a29c8c" font-family="IBM Plex Mono" font-size="10">64.5k</text>
+        <text x="0" y="186" fill="#a29c8c" font-family="IBM Plex Mono" font-size="10">64.0k</text>
+        <text x="0" y="246" fill="#a29c8c" font-family="IBM Plex Mono" font-size="10">63.5k</text>
+        <text x="0" y="306" fill="#a29c8c" font-family="IBM Plex Mono" font-size="10">63.0k</text>
+        <path d="M50,280 C180,255 300,150 420,125 C540,100 660,195 780,75 C860,15 940,68 990,50" fill="none" stroke="#c7b8e0" stroke-width="1.5"></path>
+        <path d="M50,320 C180,285 300,195 420,175 C540,160 660,235 780,135 C860,75 940,115 990,100" fill="none" stroke="#c7b8e0" stroke-width="1.5"></path>
+        <path d="M50,300 L990,75" fill="none" stroke="#d9a441" stroke-width="2.5"></path>
+        <g fill="#5fa876">
+          <rect x="80" y="290" width="6" height="26"></rect>
+          <rect x="105" y="255" width="6" height="38"></rect>
+          <rect x="130" y="228" width="6" height="30"></rect>
+          <rect x="250" y="168" width="6" height="26"></rect>
+          <rect x="520" y="195" width="6" height="22"></rect>
+          <rect x="790" y="125" width="6" height="34"></rect>
+          <rect x="850" y="92" width="6" height="26"></rect>
+          <rect x="960" y="58" width="6" height="18"></rect>
+        </g>
+        <g fill="#d9736b">
+          <rect x="170" y="210" width="6" height="26"></rect>
+          <rect x="335" y="150" width="6" height="30"></rect>
+          <rect x="375" y="132" width="6" height="22"></rect>
+          <rect x="585" y="200" width="6" height="26"></rect>
+          <rect x="710" y="168" width="6" height="18"></rect>
+          <rect x="900" y="85" width="6" height="22"></rect>
+        </g>
+        <g font-family="IBM Plex Mono" font-size="10" font-weight="700">
+          <circle cx="108" cy="285" r="12" fill="#5fa876"></circle>
+          <text x="108" y="289" fill="white" text-anchor="middle">B</text>
+          <circle cx="278" cy="203" r="12" fill="#d9736b"></circle>
+          <text x="278" y="207" fill="white" text-anchor="middle">S</text>
+          <circle cx="410" cy="171" r="12" fill="#5fa876"></circle>
+          <text x="410" y="175" fill="white" text-anchor="middle">B</text>
+          <circle cx="608" cy="197" r="12" fill="#5fa876"></circle>
+          <text x="608" y="201" fill="white" text-anchor="middle">B</text>
+          <circle cx="843" cy="94" r="12" fill="#d9736b"></circle>
+          <text x="843" y="98" fill="white" text-anchor="middle">S</text>
+        </g>
+        <line x1="0" y1="320" x2="1000" y2="320" stroke="#efece4"></line>
+        <text x="180" y="336" fill="#a29c8c" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">04 AUG</text>
+        <text x="420" y="336" fill="#a29c8c" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">05 AUG</text>
+        <text x="670" y="336" fill="#a29c8c" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">06 AUG</text>
+        <text x="920" y="336" fill="#a29c8c" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">07 AUG</text>
+      </svg>
+    </div>
+
+    <div class="card equity-card" style="grid-column:span 4;">
+      <div style="font-size:14px; font-weight:700; margin-bottom:8px; flex-shrink:0;">Equity curve</div>
+      <svg viewBox="0 0 300 190" preserveAspectRatio="none" style="width:100%; height:100%; min-height:0; display:block;">
+        <defs>
+          <linearGradient id="eq3" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#5fa876" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="#5fa876" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="M10,170 L20,55 L120,45 L290,8 L290,190 L10,190 Z" fill="url(#eq3)"></path>
+        <path d="M10,170 L20,55 L120,45 L290,8" fill="none" stroke="#4f8f5c" stroke-width="2.5"></path>
+      </svg>
+      <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#a29c8c; margin-top:4px; flex-shrink:0;">
+        <span>11:00</span><span>8/5</span><span>15:00</span><span>04:00</span>
+      </div>
+    </div>
+
+    <div class="card trades-card" style="grid-column:span 12; overflow:hidden;">
+      <div style="font-size:13px; font-weight:700; margin-bottom:6px; flex-shrink:0;">Trade history</div>
+      <table class="trades">
+        <thead>
+          <tr><th>ENTRY TIME</th><th>DIR</th><th>ENTRY</th><th>EXIT</th><th>REASON</th><th>P&amp;L %</th><th>P&amp;L $</th><th>EXIT TIME</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono" style="color:#544f45;">Aug 6, 13:06</td>
+            <td><span class="pill" style="background:#e5f0e5; color:#4f8f5c; padding:2px 8px; font-size:10px;">LONG</span></td>
+            <td class="mono">$64,248.17</td>
+            <td class="mono">$65,165.77</td>
+            <td style="color:#a29c8c;">TP</td>
+            <td class="mono" style="color:#4f8f5c; font-weight:700;">+13.08%</td>
+            <td class="mono" style="color:#4f8f5c; font-weight:700;">+$34.16</td>
+            <td class="mono" style="color:#544f45;">Aug 7, 11:23</td>
+          </tr>
+          <tr>
+            <td class="mono" style="color:#544f45;">Aug 5, 13:34</td>
+            <td><span class="pill" style="background:#e5f0e5; color:#4f8f5c; padding:2px 8px; font-size:10px;">LONG</span></td>
+            <td class="mono">$63,877.75</td>
+            <td class="mono">$64,507.62</td>
+            <td style="color:#a29c8c;">TP</td>
+            <td class="mono" style="color:#4f8f5c; font-weight:700;">+8.66%</td>
+            <td class="mono" style="color:#4f8f5c; font-weight:700;">+$22.14</td>
+            <td class="mono" style="color:#544f45;">Aug 5, 14:16</td>
+          </tr>
+          <tr>
+            <td class="mono" style="color:#544f45;">Aug 4, 10:15</td>
+            <td><span class="pill" style="background:#e5f0e5; color:#4f8f5c; padding:2px 8px; font-size:10px;">LONG</span></td>
+            <td class="mono">$63,456.17</td>
+            <td class="mono">$64,101.08</td>
+            <td style="color:#a29c8c;">TP</td>
+            <td class="mono" style="color:#4f8f5c; font-weight:700;">+8.96%</td>
+            <td class="mono" style="color:#4f8f5c; font-weight:700;">+$22.41</td>
+            <td class="mono" style="color:#544f45;">Aug 4, 14:40</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
