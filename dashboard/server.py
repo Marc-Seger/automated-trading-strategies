@@ -670,9 +670,7 @@ def api_live_chart():
     Query params:
       symbol — symbol_key from config (default "BTC")
       from, to — ISO date/datetime strings for the display window. If either
-        is omitted, defaults to the candle before the earliest of the last 5
-        trades through now (1 day minimum if no trades exist yet) — same
-        default as before explicit ranges existed.
+        is omitted, defaults to a 7-day window ending now.
     """
     from strategies.bb_channel import (
         compute_bb, compute_ema, BB_PERIOD, BB_STD, TREND_PERIOD,
@@ -708,28 +706,9 @@ def api_live_chart():
             return int(d.timestamp() * 1000)
         resolution_span_ms = _floor_to_day(to_ms) - _floor_to_day(from_ms)
     else:
-        # Default window: candle before the open of the earliest of the last 5
-        # trades (open or closed) through the live candle. Falls back to 1 day
-        # if no trades exist yet.
-        trades_path = os.path.join(BASE_DIR, "data", "trades", f"bb_bot_trades_{symbol_key}.json")
-        trades = []
-        if os.path.exists(trades_path):
-            try:
-                with open(trades_path) as f:
-                    trades = json.load(f)
-            except Exception:
-                trades = []
-
-        last5 = sorted(
-            (t for t in trades if t.get("entry_ts")),
-            key=lambda t: t["entry_ts"],
-        )[-5:]
-        to_ms = now_ms
-        if last5:
-            earliest_entry_ms = min(t["entry_ts"] for t in last5)
-            from_ms = earliest_entry_ms - 900_000   # candle before, at 15m resolution
-        else:
-            from_ms = now_ms - 24 * 3600 * 1000     # 1 day minimum when no trades exist yet
+        # Default window: 7 days ending now.
+        to_ms   = now_ms
+        from_ms = now_ms - 7 * 24 * 3600 * 1000
 
     if to_ms <= from_ms:
         return jsonify({"error": "to must be after from"}), 400
