@@ -63,6 +63,33 @@ app = Flask(__name__, static_folder=DASHBOARD_DIR)
 # Global state (populated on startup)
 CONFIG:      dict = {}
 INDICATOR_OHLCV_CACHE: dict = {}  # symbol -> timeframe -> list of candles
+_MEXC_EXCHANGE = None  # shared ccxt.mexc() client, see _get_mexc_exchange()
+
+
+def _get_mexc_exchange():
+    """
+    Shared, long-lived ccxt.mexc() client, reused across every request.
+
+    Previously each gap-fill created a brand new ccxt.mexc() instance, which
+    meant every call re-triggered ccxt's lazy load_markets() — that can hit
+    MEXC's rate-limited spot /capital/config/getall endpoint instead of the
+    swap one (the same gotcha bots/bb_bot.py already works around). Under the
+    Live Bot chart's 15s auto-refresh that meant a fresh client — and a fresh
+    failing/slow lazy-load — on every single poll, which piled up unclosed
+    connections and took the VPS down on 2026-08-08. Pre-loading swap markets
+    once, like bb_bot.py already does, avoids the lazy-load path entirely.
+    """
+    global _MEXC_EXCHANGE
+    if _MEXC_EXCHANGE is None:
+        mx_cfg = CONFIG.get("mexc", {})
+        exchange = ccxt.mexc({
+            "apiKey": mx_cfg.get("api_key", ""),
+            "secret": mx_cfg.get("api_secret", ""),
+            "options": {"defaultType": "swap"},
+        })
+        exchange.fetch_markets({"type": "swap"})
+        _MEXC_EXCHANGE = exchange
+    return _MEXC_EXCHANGE
 
 
 # ---------------------------------------------------------------------------
@@ -167,15 +194,23 @@ def _fetch_ohlcv_range(exchange, symbol: str, timeframe: str, from_ms: int, to_m
 
 
 def ensure_indicator_candles(
-    symbol: str, timeframe: str, from_ms, to_ms
+    symbol: str, timeframe: str, from_ms, to_ms, force_tail_ms: int = 0
 ) -> list:
     """
     Return all cached candles for symbol+timeframe that cover [from_ms, to_ms]
     (plus warmup buffer). Fetches only the gaps not already on disk, merges,
     and writes back to disk so coverage grows incrementally across sessions.
+
+    force_tail_ms: when >0, always re-fetch the trailing window of this width
+    ending at to_ms, even if the cache already has it. The cache treats any
+    timestamp it already holds as permanently settled, but a candle fetched
+    while still forming stays frozen at that partial snapshot forever unless
+    something forces a re-check — this is how a live-tracking caller (the
+    Live Bot chart) keeps its current and most-recently-closed candle honest.
     """
     # Extend fetch start by warmup buffer so indicators are seeded before display window
-    warmup_ms  = _WARMUP_CANDLES * _TF_MS.get(timeframe, 3_600_000)
+    tf_ms      = _TF_MS.get(timeframe, 3_600_000)
+    warmup_ms  = _WARMUP_CANDLES * tf_ms
     fetch_from = from_ms - warmup_ms
 
     # Load in-memory cache, falling back to disk
@@ -184,14 +219,11 @@ def ensure_indicator_candles(
         cached = _load_disk_ind_cache(symbol, timeframe)
         INDICATOR_OHLCV_CACHE.setdefault(symbol, {})[timeframe] = cached
 
-    gaps = _compute_gaps(cached, fetch_from, to_ms, tf_ms=_TF_MS.get(timeframe, 3_600_000))
+    gaps = _compute_gaps(cached, fetch_from, to_ms, tf_ms=tf_ms)
+    if force_tail_ms > 0:
+        gaps.append((max(fetch_from, to_ms - force_tail_ms), to_ms))
     if gaps:
-        mx_cfg = CONFIG.get("mexc", {})
-        exchange = ccxt.mexc({
-            "apiKey": mx_cfg.get("api_key", ""),
-            "secret": mx_cfg.get("api_secret", ""),
-            "options": {"defaultType": "swap"},   # use futures OHLCV (avoids spot exchangeInfo call)
-        })
+        exchange = _get_mexc_exchange()
         # MEXC futures symbol format: "BTC/USDT" → "BTC/USDT:USDT"
         fetch_symbol = symbol if ":" in symbol else symbol + ":USDT"
         new_candles = []
@@ -510,12 +542,7 @@ def api_indicator_earliest():
     key = (symbol, tf)
     if key not in _EARLIEST_CACHE:
         try:
-            mx_cfg = CONFIG.get("mexc", {})
-            ex = ccxt.mexc({
-                "apiKey": mx_cfg.get("api_key", ""),
-                "secret": mx_cfg.get("api_secret", ""),
-                "options": {"defaultType": "swap"},
-            })
+            ex = _get_mexc_exchange()
             fetch_sym = symbol if ":" in symbol else symbol + ":USDT"
             earliest_ms = None
             found_year = None
@@ -719,8 +746,15 @@ def api_live_chart():
     warmup_ms  = max(BB_PERIOD, TREND_PERIOD) * candle_ms   # candles needed to seed indicators
     fetch_from = from_ms - warmup_ms * 3                    # generous extra buffer
 
+    # A request tracking "now" (to_ms within one candle of the real current
+    # time) is a live-tracking view — force a re-fetch of the last 2 candles
+    # on every call so the forming candle and the most-recently-closed one
+    # never sit frozen on a stale first-fetch snapshot (see docstring above).
+    is_live_request = to_ms >= now_ms - candle_ms
+    force_tail_ms    = candle_ms * 2 if is_live_request else 0
+
     try:
-        candles = ensure_indicator_candles(ccxt_sym, timeframe, fetch_from, to_ms)
+        candles = ensure_indicator_candles(ccxt_sym, timeframe, fetch_from, to_ms, force_tail_ms=force_tail_ms)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
