@@ -142,8 +142,8 @@
     <p class="text-xs font-semibold text-gray-400 uppercase mb-1">Candle Timeframe</p>
     <div class="flex gap-1 flex-wrap">
       <button onclick="setIndTimeframe('5m')"  class="ind-tf-btn text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100">5m</button>
-      <button onclick="setIndTimeframe('15m')" class="ind-tf-btn text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100">15m</button>
-      <button onclick="setIndTimeframe('1h')"  class="ind-tf-btn text-xs px-2 py-0.5 rounded bg-indigo-600 text-white font-bold">1h</button>
+      <button onclick="setIndTimeframe('15m')" class="ind-tf-btn text-xs px-2 py-0.5 rounded bg-indigo-600 text-white font-bold">15m</button>
+      <button onclick="setIndTimeframe('1h')"  class="ind-tf-btn text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100">1h</button>
       <button onclick="setIndTimeframe('4h')"  class="ind-tf-btn text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100">4h</button>
       <button onclick="setIndTimeframe('1d')"  class="ind-tf-btn text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100">1d</button>
     </div>
@@ -188,7 +188,7 @@
       <option value="ma_cross">MA Cross</option>
       <option value="price_vs_ma">Price vs MA</option>
       <option value="bollinger">Bollinger Bands</option>
-      <option value="bb_channel">BB Channel Rider</option>
+      <option value="bb_channel" selected>BB Channel Rider (live)</option>
       <option value="rsi">RSI</option>
     </select>
 
@@ -201,7 +201,7 @@
     </div>
 
     <!-- MA Cross params -->
-    <div id="ind-params-ma_cross">
+    <div id="ind-params-ma_cross" class="hidden">
       <p class="text-xs text-gray-400 mb-1">MA Type</p>
       <div class="flex gap-1 mb-2">
         <button onclick="setIndMaType('ema')" class="ind-ma-btn text-xs px-2 py-0.5 rounded bg-indigo-600 text-white font-bold flex-1">EMA</button>
@@ -250,29 +250,29 @@
         oninput="document.getElementById('ind-overbought-val').textContent=this.value">
     </div>
 
-    <!-- BB Channel params -->
-    <div id="ind-params-bb_channel" class="hidden">
+    <!-- BB Channel params — defaults match the frozen live spec (STRATEGY_SPEC.md, locked 2026-05-10) -->
+    <div id="ind-params-bb_channel">
       <p class="text-xs text-gray-400 mb-1">BB Period: <span id="ind-bbc-period-val" class="text-indigo-300 font-bold">20</span></p>
       <input type="range" id="ind-bbc-period" min="5" max="100" step="1" value="20" class="w-full accent-indigo-500"
         oninput="document.getElementById('ind-bbc-period-val').textContent=this.value">
-      <p class="text-xs text-gray-400 mt-2 mb-1">Std dev: <span id="ind-bbc-std-val" class="text-indigo-300 font-bold">2.0</span></p>
-      <input type="range" id="ind-bbc-std" min="1" max="4" step="0.5" value="2" class="w-full accent-indigo-500"
+      <p class="text-xs text-gray-400 mt-2 mb-1">Std dev: <span id="ind-bbc-std-val" class="text-indigo-300 font-bold">3.0</span></p>
+      <input type="range" id="ind-bbc-std" min="1" max="4" step="0.5" value="3" class="w-full accent-indigo-500"
         oninput="document.getElementById('ind-bbc-std-val').textContent=parseFloat(this.value).toFixed(1)">
-      <p class="text-xs text-gray-400 mt-3 mb-1">SL snap threshold: <span id="ind-bbc-threshold-val" class="text-indigo-300 font-bold">75%</span>
+      <p class="text-xs text-gray-400 mt-3 mb-1">SL snap threshold: <span id="ind-bbc-threshold-val" class="text-indigo-300 font-bold">95%</span>
         <span class="text-gray-600 text-xs">of mid→band</span></p>
-      <input type="range" id="ind-bbc-threshold" min="0.3" max="0.95" step="0.05" value="0.75" class="w-full accent-indigo-500"
+      <input type="range" id="ind-bbc-threshold" min="0.3" max="0.95" step="0.05" value="0.95" class="w-full accent-indigo-500"
         oninput="document.getElementById('ind-bbc-threshold-val').textContent=Math.round(this.value*100)+'%'">
       <p class="text-xs text-gray-400 mt-3 mb-1">Cooldown candles: <span id="ind-bbc-cooldown-val" class="text-indigo-300 font-bold">2</span></p>
       <input type="range" id="ind-bbc-cooldown" min="0" max="10" step="1" value="2" class="w-full accent-indigo-500"
         oninput="document.getElementById('ind-bbc-cooldown-val').textContent=this.value">
       <label class="flex items-center gap-2 mt-3 text-xs text-gray-300 cursor-pointer">
-        <input type="checkbox" id="ind-bbc-trend-filter" class="accent-indigo-500"
+        <input type="checkbox" id="ind-bbc-trend-filter" class="accent-indigo-500" checked
           onchange="document.getElementById('ind-bbc-trend-row').classList.toggle('hidden', !this.checked)">
         Trend filter (EMA)
       </label>
-      <div id="ind-bbc-trend-row" class="hidden mt-1">
-        <p class="text-xs text-gray-400 mb-1">Trend EMA period: <span id="ind-bbc-trend-period-val" class="text-indigo-300 font-bold">200</span></p>
-        <input type="range" id="ind-bbc-trend-period" min="20" max="500" step="10" value="200" class="w-full accent-indigo-500"
+      <div id="ind-bbc-trend-row" class="mt-1">
+        <p class="text-xs text-gray-400 mb-1">Trend EMA period: <span id="ind-bbc-trend-period-val" class="text-indigo-300 font-bold">150</span></p>
+        <input type="range" id="ind-bbc-trend-period" min="20" max="500" step="10" value="150" class="w-full accent-indigo-500"
           oninput="document.getElementById('ind-bbc-trend-period-val').textContent=this.value">
         <p class="text-xs text-gray-500 mt-1">Long only when close &gt; EMA · Short only when close &lt; EMA</p>
       </div>
@@ -282,8 +282,8 @@
   <!-- SL / TP -->
   <div class="border border-gray-700 rounded p-2">
     <p class="text-xs font-semibold text-gray-400 uppercase mb-2">SL / TP</p>
-    <p class="text-xs text-gray-400 mb-1">SL %: <span id="ind-sl-val" class="text-orange-300 font-bold">5.0%</span></p>
-    <input type="range" id="ind-sl" min="0.5" max="30" step="0.5" value="5" class="w-full accent-orange-400"
+    <p class="text-xs text-gray-400 mb-1">SL %: <span id="ind-sl-val" class="text-orange-300 font-bold">1.0%</span></p>
+    <input type="range" id="ind-sl" min="0.5" max="30" step="0.5" value="1" class="w-full accent-orange-400"
       oninput="document.getElementById('ind-sl-val').textContent=parseFloat(this.value).toFixed(1)+'%'">
     <div id="ind-tp-row">
       <p class="text-xs text-gray-400 mt-2 mb-1">TP %: <span id="ind-tp-val" class="text-green-300 font-bold">10.0%</span></p>
@@ -295,8 +295,8 @@
   <!-- Leverage & Fees -->
   <div class="border border-gray-700 rounded p-2">
     <p class="text-xs font-semibold text-gray-400 uppercase mb-2">Leverage & Fees</p>
-    <p class="text-xs text-gray-400 mb-1">Leverage: <span id="ind-lev-val" class="text-purple-300 font-bold">1x</span></p>
-    <input type="range" id="ind-lev" min="1" max="20" step="1" value="1" class="w-full accent-purple-400"
+    <p class="text-xs text-gray-400 mb-1">Leverage: <span id="ind-lev-val" class="text-purple-300 font-bold">10x</span></p>
+    <input type="range" id="ind-lev" min="1" max="20" step="1" value="10" class="w-full accent-purple-400"
       oninput="document.getElementById('ind-lev-val').textContent=this.value+'x'">
     <p class="text-xs font-semibold text-gray-400 uppercase mt-3 mb-1">Fees</p>
     <div class="flex gap-1">
@@ -323,12 +323,12 @@
     <!-- Per-trade mode toggle -->
     <div class="flex items-center gap-1 mb-2">
       <button id="ind-pt-flat-btn" onclick="setIndPerTradeMode('flat')"
-        class="text-xs px-2 py-0.5 rounded bg-indigo-600 text-white font-bold flex-1">$ flat</button>
+        class="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100 flex-1">$ flat</button>
       <button id="ind-pt-pct-btn" onclick="setIndPerTradeMode('pct')"
-        class="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100 flex-1">% capital</button>
+        class="text-xs px-2 py-0.5 rounded bg-indigo-600 text-white font-bold flex-1">% capital</button>
     </div>
     <!-- Flat dollar input -->
-    <div id="ind-pt-flat-row" class="flex items-center gap-2">
+    <div id="ind-pt-flat-row" class="hidden flex items-center gap-2">
       <span class="text-xs text-gray-400" style="min-width:72px">Per trade</span>
       <div class="relative flex-1">
         <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
@@ -337,10 +337,10 @@
       </div>
     </div>
     <!-- % of capital input -->
-    <div id="ind-pt-pct-row" class="hidden flex items-center gap-2">
+    <div id="ind-pt-pct-row" class="flex items-center gap-2">
       <span class="text-xs text-gray-400" style="min-width:72px">Per trade</span>
       <div class="relative flex-1">
-        <input type="number" id="ind-per-trade-pct" value="5" min="0.1" max="100" step="0.5"
+        <input type="number" id="ind-per-trade-pct" value="25" min="0.1" max="100" step="0.5"
           class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100 focus:outline-none focus:border-indigo-500">
         <span class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
       </div>
@@ -1274,14 +1274,14 @@ let indSymbol    = "BTC/USDT";
 let indDir       = "both";
 let indMaType    = "ema";
 let indFeeMode   = "none";
-let indTimeframe = "1h";
+let indTimeframe = "15m";
 let indEquityChart   = null;
 let indPriceChart    = null;
 let indRsiChart      = null;
 let _indChartTrades  = [];
 let _indFlipKeys     = new Set();
 let indEquityMode    = "usd";   // "usd" | "pct"
-let indPerTradeMode  = "flat";  // "flat" | "pct"
+let indPerTradeMode  = "pct";   // "flat" | "pct" — default matches BB Channel Rider's 25% sizing
 let indDisplayedTrades = [];    // trades currently shown in table (for modal click)
 let indLastData      = null;    // last full API response, used to re-render on mode toggle
 let indLastTimeframe = "1h";    // timeframe of last simulation run
@@ -2163,6 +2163,7 @@ function renderIndChart(data) {
 
 /* ── Bootstrap ──────────────────────────────────────────────────── */
 switchTab('indicator');
+updateIndStrategyUI();   // sync param-panel visibility to the BB Channel Rider default
 fetchIndEarliest(indSymbol, indTimeframe);
 
 /* ══════════════════════════════════════════════════════
@@ -2342,6 +2343,22 @@ async function liveBuildChart(state, trades, opts) {
   // _t; disambiguating entry vs exit uses an explicit _isEntry flag rather
   // than comparing x back to entry_ts, since snapping can make two
   // timestamps land on the same candle.
+  //
+  // y is nudged off the candle's own high/low (not the trade's exact fill
+  // price) so the marker never overlaps the wick: "B" sits just below the
+  // candle's low, "S" just above its high. Offset is a fixed fraction of
+  // the visible price range, not per-candle, so spacing looks consistent
+  // across calm and volatile candles alike.
+  const candleByTs = new Map(candles.map(c => [c[0], c]));
+  const visibleHigh = Math.max(...candles.map(c => c[2]));
+  const visibleLow  = Math.min(...candles.map(c => c[3]));
+  const markerYOffset = (visibleHigh - visibleLow) * 0.012;
+  function _markerY(candleTs, side, fallbackPrice) {
+    const c = candleByTs.get(candleTs);
+    if (!c) return fallbackPrice; // shouldn't happen — snap always picks a real candle ts
+    return side === "buy" ? c[3] - markerYOffset : c[2] + markerYOffset;
+  }
+
   const sz = _liveMarkerRadius(to_ms - from_ms) * 2;
   const buyImg  = makeLetterMarker("B", "#5fa876", sz);
   const sellImg = makeLetterMarker("S", "#d9736b", sz);
@@ -2357,19 +2374,19 @@ async function liveBuildChart(state, trades, opts) {
     const dir     = t.direction;
     if (!entryTs) return;
     const entryX = _snapTsToCandleOpen(candles, entryTs);
-    if (dir === "long")  buyPoints.push({ x: entryX, y: t.entry, _t: t, _isEntry: true });
-    else                 sellPoints.push({ x: entryX, y: t.entry, _t: t, _isEntry: true });
+    if (dir === "long")  buyPoints.push({ x: entryX, y: _markerY(entryX, "buy", t.entry), _t: t, _isEntry: true });
+    else                 sellPoints.push({ x: entryX, y: _markerY(entryX, "sell", t.entry), _t: t, _isEntry: true });
     if (exitTs && t.exit) {
       const exitX = _snapTsToCandleOpen(candles, exitTs);
-      if (dir === "long") sellPoints.push({ x: exitX, y: t.exit, _t: t, _isEntry: false });
-      else                buyPoints.push({ x: exitX, y: t.exit, _t: t, _isEntry: false });
+      if (dir === "long") sellPoints.push({ x: exitX, y: _markerY(exitX, "sell", t.exit), _t: t, _isEntry: false });
+      else                buyPoints.push({ x: exitX, y: _markerY(exitX, "buy", t.exit), _t: t, _isEntry: false });
     }
   });
 
   // Grey "B" for the open position entry (not yet closed)
   if (state && state.phase === "in_position" && state.pos_entry_ts) {
     const openX = _snapTsToCandleOpen(candles, state.pos_entry_ts);
-    openPoints.push({ x: openX, y: state.pos_entry, _t: state, _isEntry: true });
+    openPoints.push({ x: openX, y: _markerY(openX, "buy", state.pos_entry), _t: state, _isEntry: true });
   }
 
   // ── Annotation lines ─────────────────────────────────────────
@@ -2535,7 +2552,15 @@ async function liveRefresh() {
   liveRender(data);
 
   const curSymbol = (document.getElementById("live-symbol").value || "BTC").trim().toUpperCase();
-  const needRebuild = !livePriceChart || _livePriceSymbol !== curSymbol;
+  // Rebuild (refetch candles) on every tick while viewing a "live" range —
+  // otherwise a periodic refresh only updates the TP/SL/entry annotation
+  // lines and a newly-closed candle wouldn't appear until something else
+  // (symbol change, manual Apply) forced a rebuild. A frozen historical
+  // range has nothing new to fetch, so it stays on the cheap annotation-only
+  // path. Chart.js animation is off, so the destroy/recreate is an instant
+  // redraw, not a flash.
+  const needRebuild = !livePriceChart || _livePriceSymbol !== curSymbol
+    || _liveRangeIsLive(_liveChartToMs);
   if (needRebuild) {
     await liveBuildChart(data.state, data.trades);
   } else {

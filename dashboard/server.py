@@ -643,21 +643,20 @@ def api_bb_bot_status():
 # ---------------------------------------------------------------------------
 
 
-# Candle resolution auto-selected from the visible span, same idea as most
-# charting tools (TradingView etc): finer candles up close, coarser candles
-# zoomed out, so the bar count stays readable at any range.
-_RESOLUTION_BREAKPOINTS = [
-    (24 * 3600 * 1000,        "15m"),
-    (3  * 24 * 3600 * 1000,   "1h"),
-    (10 * 24 * 3600 * 1000,   "4h"),
-    (365 * 24 * 3600 * 1000,  "1d"),
-]
+# Candle resolution auto-selected from the visible span: pick the FINEST
+# resolution (most precision) whose candle count over the span still fits
+# within a single MEXC OHLCV request (limit=500, same cap _fetch_ohlcv_range
+# already pages against) — 500 15m candles covers ~5.2 days before the count
+# forces a move to 1h, etc. Falls back to the coarsest resolution (1w) once
+# even that would exceed 500 candles (spans over ~9.6 years).
+_LIVE_CHART_RESOLUTIONS = ["15m", "1h", "4h", "1d", "1w"]
+_LIVE_CHART_MAX_CANDLES = 500
 
 def _timeframe_for_span(span_ms: int) -> str:
-    for max_span, tf in _RESOLUTION_BREAKPOINTS:
-        if span_ms <= max_span:
+    for tf in _LIVE_CHART_RESOLUTIONS:
+        if span_ms / _TF_MS[tf] <= _LIVE_CHART_MAX_CANDLES:
             return tf
-    return "1w"
+    return _LIVE_CHART_RESOLUTIONS[-1]
 
 
 @app.route("/api/live_chart")
