@@ -2270,17 +2270,17 @@ function liveUpdateChartAnnotations(state) {
     if (state.pos_entry) annotations.entry = {
       type: "line", scaleID: "y", value: state.pos_entry,
       borderColor: "#6b8fae", borderWidth: 1, borderDash: [4, 4],
-      label: { content: `Entry $${state.pos_entry.toFixed(0)}`, display: true, color: "#6b8fae", backgroundColor: "transparent", font: { size: 10 }, position: "start", yAdjust: entryAboveTp ? -8 : 8 },
+      label: { content: `Entry $${state.pos_entry.toFixed(0)}`, display: true, color: "#6b8fae", backgroundColor: "transparent", font: { size: 10 }, position: "end", yAdjust: entryAboveTp ? -8 : 8 },
     };
     if (state.pos_tp) annotations.tp = {
       type: "line", scaleID: "y", value: state.pos_tp,
       borderColor: "#5fa876", borderWidth: 1.5, borderDash: [6, 3],
-      label: { content: `TP $${state.pos_tp.toFixed(0)}`, display: true, color: "#5fa876", backgroundColor: "transparent", font: { size: 10 }, position: "start", yAdjust: entryAboveTp ? 8 : -8 },
+      label: { content: `TP $${state.pos_tp.toFixed(0)}`, display: true, color: "#5fa876", backgroundColor: "transparent", font: { size: 10 }, position: "end", yAdjust: entryAboveTp ? 8 : -8 },
     };
     if (state.pos_sl) annotations.sl = {
       type: "line", scaleID: "y", value: state.pos_sl,
       borderColor: "#d9736b", borderWidth: 1.5, borderDash: [6, 3],
-      label: { content: `SL $${state.pos_sl.toFixed(0)}`, display: true, color: "#d9736b", backgroundColor: "transparent", font: { size: 10 }, position: "start" },
+      label: { content: `SL $${state.pos_sl.toFixed(0)}`, display: true, color: "#d9736b", backgroundColor: "transparent", font: { size: 10 }, position: "end" },
     };
     if (state.pos_backstop) annotations.backstop = {
       type: "line", scaleID: "y", value: state.pos_backstop,
@@ -2424,17 +2424,17 @@ async function liveBuildChart(state, trades, opts) {
     if (state.pos_entry) annotations.entry = {
       type: "line", scaleID: "y", value: state.pos_entry,
       borderColor: "#6b8fae", borderWidth: 1, borderDash: [4, 4],
-      label: { content: `Entry $${state.pos_entry.toFixed(0)}`, display: true, color: "#6b8fae", backgroundColor: "transparent", font: { size: 10 }, position: "start", yAdjust: entryAboveTp ? -8 : 8 },
+      label: { content: `Entry $${state.pos_entry.toFixed(0)}`, display: true, color: "#6b8fae", backgroundColor: "transparent", font: { size: 10 }, position: "end", yAdjust: entryAboveTp ? -8 : 8 },
     };
     if (state.pos_tp) annotations.tp = {
       type: "line", scaleID: "y", value: state.pos_tp,
       borderColor: "#5fa876", borderWidth: 1.5, borderDash: [6, 3],
-      label: { content: `TP $${state.pos_tp.toFixed(0)}`, display: true, color: "#5fa876", backgroundColor: "transparent", font: { size: 10 }, position: "start", yAdjust: entryAboveTp ? 8 : -8 },
+      label: { content: `TP $${state.pos_tp.toFixed(0)}`, display: true, color: "#5fa876", backgroundColor: "transparent", font: { size: 10 }, position: "end", yAdjust: entryAboveTp ? 8 : -8 },
     };
     if (state.pos_sl) annotations.sl = {
       type: "line", scaleID: "y", value: state.pos_sl,
       borderColor: "#d9736b", borderWidth: 1.5, borderDash: [6, 3],
-      label: { content: `SL $${state.pos_sl.toFixed(0)}`, display: true, color: "#d9736b", backgroundColor: "transparent", font: { size: 10 }, position: "start" },
+      label: { content: `SL $${state.pos_sl.toFixed(0)}`, display: true, color: "#d9736b", backgroundColor: "transparent", font: { size: 10 }, position: "end" },
     };
     if (state.pos_backstop) annotations.backstop = {
       type: "line", scaleID: "y", value: state.pos_backstop,
