@@ -1010,8 +1010,17 @@
     <div class="flex items-center gap-3 mb-3">
       <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Open Position</span>
       <span id="live-pos-dir-badge" class="px-2 py-0.5 rounded text-xs font-bold">LONG</span>
+      <span class="px-2 py-0.5 rounded text-xs font-bold bg-indigo-900 text-indigo-300">10X</span>
     </div>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+      <div>
+        <span class="text-gray-500">Date</span>
+        <p id="live-pos-ts" class="text-gray-300 font-semibold mt-0.5">—</p>
+      </div>
+      <div>
+        <span class="text-gray-500">Capital</span>
+        <p id="live-pos-capital" class="text-gray-100 font-semibold mt-0.5">—</p>
+      </div>
       <div>
         <span class="text-gray-500">Entry</span>
         <p id="live-pos-entry" class="text-gray-100 font-semibold mt-0.5">—</p>
@@ -1023,26 +1032,6 @@
       <div>
         <span class="text-gray-500">TP</span>
         <p id="live-pos-tp" class="text-green-400 font-semibold mt-0.5">—</p>
-      </div>
-      <div>
-        <span class="text-gray-500">Snap</span>
-        <p id="live-pos-snap" class="text-yellow-400 font-semibold mt-0.5">—</p>
-      </div>
-      <div>
-        <span class="text-gray-500">Quantity</span>
-        <p id="live-pos-qty" class="text-gray-100 font-semibold mt-0.5">—</p>
-      </div>
-      <div>
-        <span class="text-gray-500">SL snapped</span>
-        <p id="live-pos-snapped" class="text-gray-100 font-semibold mt-0.5">—</p>
-      </div>
-      <div>
-        <span class="text-gray-500">snap_at</span>
-        <p id="live-pos-snapAt" class="text-yellow-300 font-semibold mt-0.5">—</p>
-      </div>
-      <div>
-        <span class="text-gray-500">Entered</span>
-        <p id="live-pos-ts" class="text-gray-300 font-semibold mt-0.5">—</p>
       </div>
     </div>
   </div>
@@ -2640,10 +2629,13 @@ function liveRender(data) {
     document.getElementById("live-pos-entry").textContent  = `$${fmt(state.pos_entry)}`;
     document.getElementById("live-pos-sl").textContent     = state.pos_sl     ? `$${fmt(state.pos_sl)}`     : "—";
     document.getElementById("live-pos-tp").textContent     = state.pos_tp     ? `$${fmt(state.pos_tp)}`     : "—";
-    document.getElementById("live-pos-snap").textContent   = state.pos_snap_at ? `$${fmt(state.pos_snap_at)}` : "—";
-    document.getElementById("live-pos-qty").textContent    = state.pos_quantity ?? "—";
-    document.getElementById("live-pos-snapped").textContent = state.pos_sl_snapped ? "Yes ✓" : "No";
-    document.getElementById("live-pos-snapAt").textContent = state.pos_snap_at ? `$${fmt(state.pos_snap_at)}` : "—";
+    // Capital = margin actually committed to this trade (quantity * entry *
+    // contract lot / leverage), not the account's total running capital —
+    // more meaningful than raw contract count for gauging position size.
+    const margin = (state.pos_quantity != null && state.pos_entry != null)
+      ? (state.pos_quantity * state.pos_entry * 0.0001) / LIVE_LEVERAGE
+      : null;
+    document.getElementById("live-pos-capital").textContent = margin != null ? `$${fmt(margin)}` : "—";
     if (state.pos_entry_ts) {
       const d = new Date(state.pos_entry_ts);
       document.getElementById("live-pos-ts").textContent =
