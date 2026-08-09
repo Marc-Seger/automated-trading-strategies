@@ -941,16 +941,8 @@
     </span>
 
     <div class="ml-auto flex items-center gap-4">
+      <span class="text-xs text-gray-400">Last Close: <span id="live-header-lastclose" class="text-indigo-300 font-semibold">—</span></span>
       <span id="live-last-refresh" class="text-xs text-gray-500">Not loaded</span>
-      <label class="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
-        <input type="checkbox" id="live-auto-refresh" checked
-          class="accent-indigo-500" onchange="liveAutoRefreshToggle()">
-        Auto 15s
-      </label>
-      <button onclick="liveRefresh()"
-        class="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold">
-        Refresh
-      </button>
     </div>
   </div>
 
@@ -1023,10 +1015,6 @@
       <div>
         <span class="text-gray-500">Entry</span>
         <p id="live-pos-entry" class="text-gray-100 font-semibold mt-0.5">—</p>
-      </div>
-      <div>
-        <span class="text-gray-500">Last Close</span>
-        <p id="live-pos-lastclose" class="text-indigo-300 font-semibold mt-0.5">—</p>
       </div>
       <div>
         <span class="text-gray-500">SL</span>
@@ -2174,12 +2162,6 @@ fetchIndEarliest(indSymbol, indTimeframe);
 /* ══════════════════════════════════════════════════════
    LIVE BOT TAB
 ══════════════════════════════════════════════════════ */
-function liveAutoRefreshToggle() {
-  const enabled = document.getElementById("live-auto-refresh").checked;
-  clearInterval(liveAutoTimer);
-  if (enabled) liveAutoTimer = setInterval(liveRefresh, 15000);
-}
-
 /* ── Live price chart helpers ── */
 // The currently-applied display window — set on every successful chart
 // build (initial default load or a manual date-range Apply) so periodic
@@ -2335,7 +2317,7 @@ async function liveBuildChart(state, trades, opts) {
   if (!candles.length) return;
 
   _liveLastClosePrice = candles[candles.length - 1][4];
-  const lastCloseEl = document.getElementById("live-pos-lastclose");
+  const lastCloseEl = document.getElementById("live-header-lastclose");
   if (lastCloseEl) lastCloseEl.textContent = `$${fmt(_liveLastClosePrice)}`;
 
   // Remember the resolved range so the next refresh/rebuild (symbol change,
@@ -2606,8 +2588,8 @@ async function liveRefresh() {
   document.getElementById("live-last-refresh").textContent =
     `Refreshed ${now.getUTCHours().toString().padStart(2,"0")}:${now.getUTCMinutes().toString().padStart(2,"0")}:${now.getUTCSeconds().toString().padStart(2,"0")} UTC`;
 
-  // Start auto-refresh if checkbox is on
-  if (document.getElementById("live-auto-refresh").checked && !liveAutoTimer) {
+  // Auto-refresh always runs — no manual toggle, no manual refresh button.
+  if (!liveAutoTimer) {
     liveAutoTimer = setInterval(liveRefresh, 15000);
   }
 }
