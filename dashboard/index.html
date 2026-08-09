@@ -1025,6 +1025,10 @@
         <p id="live-pos-entry" class="text-gray-100 font-semibold mt-0.5">—</p>
       </div>
       <div>
+        <span class="text-gray-500">Last Close</span>
+        <p id="live-pos-lastclose" class="text-indigo-300 font-semibold mt-0.5">—</p>
+      </div>
+      <div>
         <span class="text-gray-500">SL</span>
         <p id="live-pos-sl" class="text-red-400 font-semibold mt-0.5">—</p>
       </div>
@@ -2183,6 +2187,7 @@ function liveAutoRefreshToggle() {
 // resetting back to "today" on every tick.
 let _liveChartFromMs = null;
 let _liveChartToMs   = null;
+let _liveLastClosePrice = null; // most recent candle's close, from whatever chart data we last fetched
 
 // A range counts as "live" when its end date is today (UTC) — in that case
 // the upper bound tracks the current moment on every refresh, same as
@@ -2328,6 +2333,10 @@ async function liveBuildChart(state, trades, opts) {
 
   const { candles = [], bb_upper = [], bb_mid = [], bb_lower = [], ema = [], timeframe, from_ms, to_ms } = chartData;
   if (!candles.length) return;
+
+  _liveLastClosePrice = candles[candles.length - 1][4];
+  const lastCloseEl = document.getElementById("live-pos-lastclose");
+  if (lastCloseEl) lastCloseEl.textContent = `$${fmt(_liveLastClosePrice)}`;
 
   // Remember the resolved range so the next refresh/rebuild (symbol change,
   // periodic tick) reuses it instead of falling back to the default, and

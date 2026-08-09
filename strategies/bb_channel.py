@@ -356,6 +356,11 @@ def simulate(
     snap_thresh  = float(params.get("sl_threshold_pct", SNAP_THRESH))  # default: 0.95
     cooldown_n   = int(params.get("cooldown_n",     COOLDOWN_N))    # default: 2
     trend_on     = bool(params.get("trend_filter",  True))          # default: on
+    # Experimental (2026-08-09): floor on how close TP can compress back
+    # toward entry as the BB channel narrows during an open trade. Default
+    # 0.0 = disabled, matches current frozen live behavior exactly. See
+    # CLAUDE.md session notes for the fee-eaten-TP trade that motivated this.
+    min_tp_pct   = float(params.get("min_tp_pct",   0.0))
 
     bb_series  = compute_bb(candles, period, std_dev)
     ema_series = compute_ema(candles, trend_period)
@@ -427,6 +432,15 @@ def simulate(
         # ── In position: manage SL snap, check exit ───────────────────────
         elif phase == "in_position":
             current_tp = tp_price(direction, bb)
+            if min_tp_pct > 0:
+                # Floor TP relative to THIS position's own entry price so it
+                # can't compress back through a worthwhile distance as the
+                # channel narrows — still tracks the band normally otherwise,
+                # can still move further away, just can't collapse past this.
+                if direction == "long":
+                    current_tp = max(current_tp, entry_price * (1 + min_tp_pct))
+                else:
+                    current_tp = min(current_tp, entry_price * (1 - min_tp_pct))
 
             # SL snap: threshold fixed at entry (not recomputed each candle)
             if not snap_fired:
