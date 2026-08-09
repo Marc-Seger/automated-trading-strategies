@@ -1078,6 +1078,7 @@
             <th class="px-3 py-2 text-right">Exit</th>
             <th class="px-3 py-2 text-center">Reason</th>
             <th class="px-3 py-2 text-right">P&amp;L%</th>
+            <th class="px-3 py-2 text-right">Fees</th>
             <th class="px-3 py-2 text-right">P&amp;L $</th>
             <th class="px-3 py-2 text-right">Capital After</th>
             <th class="px-3 py-2 text-left">Exit Time (UTC)</th>
@@ -1085,7 +1086,7 @@
         </thead>
         <tbody id="live-trade-tbody">
           <tr>
-            <td colspan="9" class="px-3 py-6 text-center text-gray-600">
+            <td colspan="10" class="px-3 py-6 text-center text-gray-600">
               Click Refresh or switch to Live Bot tab to load data
             </td>
           </tr>
@@ -2669,7 +2670,7 @@ function liveRender(data) {
   const closed = trades.filter(t => t.reason !== "open").reverse(); // newest first
   _liveTradesForModal = closed; // rows reference this by index for the detail modal
   if (!closed.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="px-3 py-6 text-center text-gray-600">No closed trades yet</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="px-3 py-6 text-center text-gray-600">No closed trades yet</td></tr>`;
   } else {
     tbody.innerHTML = closed.map((t, i) => {
       const pnlPos  = (t.pnl_usdt ?? 0) >= 0;
@@ -2694,6 +2695,7 @@ function liveRender(data) {
         <td class="px-3 py-2 text-right text-gray-100">${t.exit ? "$"+fmt(t.exit) : "—"}</td>
         <td class="px-3 py-2 text-center font-semibold ${reasonCls}">${t.reason || "—"}</td>
         <td class="px-3 py-2 text-right ${pnlCls}">${t.pnl_pct != null ? (t.pnl_pct >= 0 ? "+" : "")+fmt(t.pnl_pct,2)+"%" : "—"}</td>
+        <td class="px-3 py-2 text-right text-amber-500">${t.fee_usdt != null ? "−$"+fmt(t.fee_usdt) : "—"}</td>
         <td class="px-3 py-2 text-right font-semibold ${pnlCls}">${t.pnl_usdt != null ? (pnlPos?"+":"")+`$${fmt(t.pnl_usdt)}` : "—"}</td>
         <td class="px-3 py-2 text-right text-gray-300">${t.capital != null ? "$"+fmt(t.capital) : "—"}</td>
         <td class="px-3 py-2 text-gray-400">${fmtTs(exitTs)}</td>
@@ -2814,6 +2816,22 @@ function openLiveTradeModal(i) {
       <div><span class="text-gray-400">Capital before:</span> ${capitalBefore != null ? "$" + capitalBefore.toFixed(2) : "—"}</div>
       <div><span class="text-gray-400">Capital after:</span> ${trade.capital != null ? "$" + trade.capital.toFixed(2) : "—"}</div>
     </div>
+    ${trade.gross_pnl_usdt != null && trade.fee_usdt != null ? `
+    <div class="bg-gray-800 rounded-lg px-4 py-3 mb-4 text-sm">
+      <div class="text-gray-400 text-xs uppercase tracking-wide mb-2">P&amp;L breakdown</div>
+      <div class="flex justify-between py-0.5">
+        <span class="text-gray-400">P&amp;L before fees <span class="text-gray-500">(price move only)</span></span>
+        <span class="${trade.gross_pnl_usdt >= 0 ? 'text-emerald-400' : 'text-red-400'}">${trade.gross_pnl_usdt >= 0 ? "+" : ""}$${trade.gross_pnl_usdt.toFixed(2)}</span>
+      </div>
+      <div class="flex justify-between py-0.5">
+        <span class="text-gray-400">Fees <span class="text-gray-500">(entry + exit, ${LIVE_LEVERAGE}x)</span></span>
+        <span class="text-amber-500">−$${trade.fee_usdt.toFixed(2)}</span>
+      </div>
+      <div class="flex justify-between py-1 mt-1 border-t border-gray-700 font-bold">
+        <span class="text-gray-300">Total P&amp;L</span>
+        <span class="${pnlCls}">${pnlPos ? "+" : ""}$${trade.pnl_usdt.toFixed(2)}</span>
+      </div>
+    </div>` : ""}
     <div style="height:220px"><canvas id="modal-chart"></canvas></div>
   `;
 

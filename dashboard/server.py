@@ -427,8 +427,14 @@ def api_indicator_simulate():
             "capital_at_time": capital_at_time,
         })
 
-    wins      = [t for t in trades if t["outcome"] == "take_profit"]
-    losses    = [t for t in trades if t["outcome"] == "stop_loss"]
+    # Win/loss by actual net P&L (after fees), not by outcome/exit_trigger —
+    # a trade that hits TP (price moved favorably) can still be a net loss
+    # once fees are subtracted, especially on a narrow BB channel where the
+    # raw move barely covers the round-trip fee cost. Matches how the live
+    # bot's own stats are computed (see /api/bb_bot_status below).
+    closed_trades = [t for t in trades if t["outcome"] != "open"]
+    wins      = [t for t in closed_trades if t["pnl_dollar"] > 0]
+    losses    = [t for t in closed_trades if t["pnl_dollar"] <= 0]
     evaluated = len(wins) + len(losses)
     win_rate  = len(wins) / evaluated if evaluated else 0.0
 
@@ -604,6 +610,27 @@ def api_bb_bot_status():
                 trades = json.load(f)
         except Exception:
             pass
+
+    # Add fee_usdt / gross_pnl_usdt to every trade — reconstructed from
+    # fields already stored (direction, entry, exit, quantity), not stored
+    # directly by bb_bot.py, so this works retroactively for every past
+    # trade too. notional = quantity * entry * CONTRACT_LOT is the dollar
+    # exposure at entry; gross P&L is the raw price move over that notional
+    # (the "sell higher than bought" part, before fees); fee is whatever's
+    # left once the already-stored net pnl_usdt is subtracted from that.
+    from strategies.bb_channel import CONTRACT_LOT
+    for t in trades:
+        entry = t.get("entry")
+        exit_p = t.get("exit")
+        qty = t.get("quantity")
+        pnl_usdt = t.get("pnl_usdt")
+        if None in (entry, exit_p, qty, pnl_usdt) or entry == 0:
+            continue
+        notional = qty * entry * CONTRACT_LOT
+        raw_move = (exit_p - entry) / entry if t.get("direction") == "long" else (entry - exit_p) / entry
+        gross_pnl_usdt = raw_move * notional
+        t["gross_pnl_usdt"] = round(gross_pnl_usdt, 4)
+        t["fee_usdt"] = round(gross_pnl_usdt - pnl_usdt, 4)
 
     # --- Stats ---
     closed = [t for t in trades if t.get("reason") != "open"]
