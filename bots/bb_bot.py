@@ -320,10 +320,25 @@ class BBBot:
         self.contract_lot = float(symbol_cfg.get("contract_lot", 0.0001))  # overwritten on startup
 
         self.executor = BBExecutor(config, symbol_cfg["ccxt_symbol"])
+        # Credentials come from the environment ONLY. config.yaml is tracked in
+        # git; .env is not. This previously fell back to tg_cfg["token"], which
+        # meant the tracked config was a working place to put a secret — and a
+        # config file that accepts secrets eventually receives one. Refusing the
+        # key outright is the difference between a leak and a startup error.
+        if tg_cfg.get("token") or tg_cfg.get("chat_id"):
+            raise SystemExit(
+                "Refusing to start: Telegram credentials found in config.yaml.\n"
+                "That file is tracked in git and would be published. Remove the "
+                "token/chat_id keys and set TELEGRAM_BOT_TOKEN and "
+                "TELEGRAM_NOTIFY_USER_ID in .env instead (see .env.example).\n"
+                "If the secret was already committed, rotate it via @BotFather — "
+                "deleting it from the file does not remove it from git history."
+            )
+
         self.notifier = BBNotifier(
-            token   = os.getenv("TELEGRAM_BOT_TOKEN",      tg_cfg.get("token",   "")),
-            chat_id = os.getenv("TELEGRAM_NOTIFY_USER_ID", tg_cfg.get("chat_id", "")),
-        )
+            token   = os.getenv("TELEGRAM_BOT_TOKEN", ""),
+            chat_id = os.getenv("TELEGRAM_NOTIFY_USER_ID", ""),
+        ) if tg_cfg.get("enabled", True) else BBNotifier(token="", chat_id="")
 
         # ccxt.pro exchange — WebSocket + REST (superset of ccxt)
         # newUpdates=False: watch_ohlcv() must return the full rolling window

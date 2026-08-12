@@ -42,9 +42,14 @@ bb_bot:
 # Optional: Telegram Bot API notifications when a trade opens/closes.
 # (A simple one-way alert bot — get a token from @BotFather, message it
 # once to activate the chat. Not required to run the strategy or backtest.)
+#
+# CREDENTIALS ARE NOT CONFIGURABLE HERE. This file is tracked in git; .env is not.
+# Set TELEGRAM_BOT_TOKEN and TELEGRAM_NOTIFY_USER_ID in .env — see .env.example.
+# bb_bot.py reads those env vars only, and refuses to start if it finds a token
+# key in this file, so a secret pasted here fails loudly instead of being
+# committed silently.
 telegram_bot:
-  token:   ""   # or set TELEGRAM_BOT_TOKEN in .env
-  chat_id: ""   # or set TELEGRAM_NOTIFY_USER_ID in .env
+  enabled: true   # set false to disable alerts even when .env has credentials
 
 # ------------------------------------------------------------
 # LOGGING
