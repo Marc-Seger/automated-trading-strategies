@@ -73,7 +73,12 @@ logger = logging.getLogger(__name__)
 # ── Constants ─────────────────────────────────────────────────────────────────
 CONFIG_PATH    = "config.yaml"
 CANDLE_TF      = "15m"
+CANDLE_MS      = 15 * 60_000
 CANDLES_NEEDED = 300     # 150 EMA warmup + 20 BB + 130 convergence buffer
+
+# Funding settles every 8h, so the rate history barely moves; refreshed lazily
+# on candle closes so a trade never waits on a network call in its exit path.
+FUNDING_REFRESH_MS = 30 * 60_000
 WS_LIMIT       = 302     # candles requested from WebSocket (300 closed + 1 forming + buffer)
 MIN_HISTORY    = BB_PERIOD + TREND_PERIOD   # minimum closed candles before trading
 
@@ -176,12 +181,24 @@ class BBNotifier:
         self.enabled = bool(token and chat_id)
 
     def send(self, text: str):
+        """
+        Send a message, stamped with the event time in UTC.
+
+        The stamp matters: Telegram renders *delivery* time in the reader's local
+        timezone, so a CEST phone shows 08:07 for an event the dashboard, the
+        trade log and the bot's own logs all call 06:07 — every alert needed a
+        mental +2 to reconcile. Worse, delivery time is not event time; a delayed
+        message would misreport when the trade actually happened.
+        Stamping here rather than per-message means every alert type gets it,
+        including any added later.
+        """
         if not self.enabled:
             return
+        stamped = f"{text}\n_{time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())} UTC_"
         try:
             requests.post(
                 f"https://api.telegram.org/bot{self.token}/sendMessage",
-                json={"chat_id": self.chat_id, "text": text, "parse_mode": "Markdown"},
+                json={"chat_id": self.chat_id, "text": stamped, "parse_mode": "Markdown"},
                 timeout=10,
             )
         except Exception as e:
@@ -218,17 +235,45 @@ class BBNotifier:
 
     def trade_closed(self, direction: str, entry: float, exit_p: float,
                      pnl_pct: float, pnl_usdt: float, reason: str,
-                     capital: float, mode: str):
-        emoji = "✅" if pnl_pct >= 0 else "❌"
+                     capital: float, mode: str,
+                     funding_usdt: float = 0.0, funding_windows: int = 0,
+                     net_usdt: float = None):
+        # Win/loss reads off the NET figure — the number that actually moved
+        # capital — so a trade whose funding eats its profit is not badged green.
+        net   = pnl_usdt if net_usdt is None else net_usdt
+        emoji = "✅" if net >= 0 else "❌"
         tag   = " _(PAPER)_" if mode == "paper" else ""
-        self.send(
+        body = (
             f"{emoji} *Trade Closed*{tag}\n"
             f"Dir:     {direction.upper()}\n"
             f"Entry:   `{entry:,.2f}` → `{exit_p:,.2f}`\n"
             f"Reason:  {reason}\n"
-            f"P&L:     `{pnl_pct:+.2f}%`  (`{pnl_usdt:+.2f} USDT`)\n"
-            f"Capital: `{capital:,.2f} USDT`"
+            f"P&L:     `{pnl_pct:+.2f}%`  (`{pnl_usdt:+.2f} USDT` after fees)\n"
         )
+        if funding_windows:
+            body += (f"Funding: `{-funding_usdt:+.4f} USDT` "
+                     f"({funding_windows} settlement{'' if funding_windows == 1 else 's'})\n"
+                     f"Net:     `{net:+.2f} USDT`\n")
+        body += f"Capital: `{capital:,.2f} USDT`"
+        self.send(body)
+
+    def position_abandoned(self, direction: str, entry: float, qty: int,
+                           mode: str, mark: Optional[float] = None,
+                           pnl_pct: Optional[float] = None,
+                           pnl_usdt: Optional[float] = None,
+                           held_h: Optional[float] = None):
+        tag  = " _(PAPER)_" if mode == "paper" else ""
+        body = (
+            f"⚠️ *Position Dropped on Restart*{tag}\n"
+            f"Dir:     {direction.upper()}  @  `{entry:,.2f}`  qty `{qty}`\n"
+        )
+        if mark is not None:
+            held = f"  (held {held_h:.1f}h)" if held_h is not None else ""
+            body += f"Mark:    `{mark:,.2f}`{held}\n"
+        if pnl_usdt is not None:
+            body += f"Unreal.: `{pnl_pct:+.2f}%`  (`{pnl_usdt:+.2f} USDT`)\n"
+        body += "_Not closed — no P&L booked, not logged as a trade._"
+        self.send(body)
 
     def flip_skipped(self, flip_dir: str, price: float, band: float):
         self.send(
@@ -300,6 +345,8 @@ class BBBot:
 
         # Indicator state — updated on each candle close
         self._closed_candles: list         = []
+        self._funding_rates: list          = []   # [{"ts", "rate"}], oldest first
+        self._funding_fetched_ms: float    = 0.0
         self._last_bb:    Optional[tuple]  = None   # BB of last closed candle
         self._prev_ema:   Optional[float]  = None   # EMA of second-to-last closed candle
         self._prev_close: Optional[float]  = None   # close of second-to-last closed candle
@@ -361,9 +408,14 @@ class BBBot:
                 f"need {MIN_HISTORY}. Bot will wait for more history."
             )
 
-        await self._handle_restart()
+        # Seed funding rates now so a trade closing before the first candle
+        # close is still charged correctly.
+        await self._refresh_funding_rates()
 
+        # Sent before the restart guard so an abandonment alert reads in order.
         self.notifier.started(self.symbol_key, self.mode, self.capital)
+
+        await self._handle_restart()
         await self._websocket_loop()
 
     async def _load_contract_lot(self):
@@ -424,6 +476,71 @@ class BBBot:
             logger.error(f"fetch_ohlcv (seed) failed: {e}")
             return []
 
+    async def _refresh_funding_rates(self):
+        """
+        Refresh the cached funding-rate history.
+
+        Perpetuals charge funding at fixed settlement times (every 8h on MEXC).
+        Rates only change on those settlements, so this is polled lazily on
+        candle closes rather than fetched at close time: a trade must never
+        block, or fail, on a network call in its exit path. If the fetch fails
+        the previous rates stay in use and the next candle retries.
+        """
+        now = time.time() * 1000
+        if now - self._funding_fetched_ms < FUNDING_REFRESH_MS and self._funding_rates:
+            return
+
+        def _sync():
+            ex = ccxt.mexc({"enableRateLimit": True, "options": {"defaultType": "swap"}})
+            ex.fetch_markets({"type": "swap"})
+            return ex.fetch_funding_rate_history(self.ccxt_symbol, limit=200)
+
+        try:
+            raw = await asyncio.get_event_loop().run_in_executor(None, _sync)
+            rates = sorted(
+                ({"ts": int(r["timestamp"]), "rate": float(r["fundingRate"])}
+                 for r in raw
+                 if r.get("timestamp") is not None and r.get("fundingRate") is not None),
+                key=lambda r: r["ts"],
+            )
+            if rates:
+                self._funding_rates = rates
+                self._funding_fetched_ms = now
+                logger.debug(f"Funding rates refreshed: {len(rates)} settlements")
+        except Exception as e:
+            logger.warning(f"Funding rate refresh failed (keeping previous): {e}")
+
+    def _funding_cost(self, direction: str, qty: int, entry: float,
+                      entry_ts: int, exit_ts: int) -> tuple:
+        """
+        Funding paid over the life of a position, in USDT, plus the number of
+        settlements charged. Positive = paid out, negative = received.
+
+        A position is charged if it is open when a settlement lands, so the
+        window is (entry_ts, exit_ts]. When the rate is positive longs pay
+        shorts, hence the sign flip. Notional is marked at the closed-candle
+        price nearest each settlement rather than at entry, since that is what
+        the exchange charges against; entry price is the fallback.
+
+        Returns (0.0, 0) when rates are unavailable — a missing rate history
+        must not stop a trade closing, and under-charging is visible in the
+        dashboard (which recomputes funding independently) rather than silent.
+        """
+        if not self._funding_rates or not entry_ts or not exit_ts:
+            return 0.0, 0
+
+        by_bucket = {c[0]: c[4] for c in self._closed_candles}
+        tf_ms = CANDLE_MS
+        total, n = 0.0, 0
+        for r in self._funding_rates:
+            if not (entry_ts < r["ts"] <= exit_ts):
+                continue
+            px = by_bucket.get((r["ts"] // tf_ms) * tf_ms) or entry
+            pay = qty * px * self.contract_lot * r["rate"]
+            total += pay if direction == "long" else -pay
+            n += 1
+        return total, n
+
     async def _handle_restart(self):
         """Safe recovery when restarting with an active position."""
         if self.state["phase"] != "in_position":
@@ -431,6 +548,7 @@ class BBBot:
 
         logger.warning("Restarting with in_position — cancelling orders, reverting to cooldown.")
         await self.executor.cancel_all_orders()
+        self._notify_abandoned()
 
         if self.mode == "live":
             sl  = self.state.get("pos_sl")
@@ -450,6 +568,49 @@ class BBBot:
         self.state["long_cd"]  = COOLDOWN_N
         self.state["short_cd"] = COOLDOWN_N
         save_state(self.state, self.symbol_key)
+
+    def _notify_abandoned(self):
+        """
+        Alert that a live position was dropped by the restart guard.
+
+        The position is discarded, not closed: no P&L is booked and nothing is
+        written to the trade log, so without this it disappears silently. Marked
+        to market off the last closed candle purely to report what it was worth
+        at the moment it was dropped.
+        """
+        direction = self.state.get("pos_direction")
+        entry     = self.state.get("pos_entry")
+        qty       = self.state.get("pos_quantity", 0)
+        if not direction or not entry:
+            logger.warning("Abandoned position has incomplete state — alert sent without detail.")
+            self.notifier.position_abandoned(direction or "?", entry or 0.0, qty, self.mode)
+            return
+
+        mark = pnl_pct = pnl_usdt = held_h = None
+        try:
+            if self._closed_candles:
+                mark = float(self._closed_candles[-1][4])
+                # Taker both ways — what it would have cost to market out here.
+                pnl_pct, pnl_usdt = calc_pnl(
+                    direction, entry, mark, self.leverage,
+                    self.capital, self.sizing_pct,
+                    fee_entry_rate=FEE_TAKER,
+                    fee_exit_rate=FEE_TAKER,
+                )
+            entry_ts = self.state.get("pos_entry_ts")
+            if entry_ts:
+                held_h = (time.time() * 1000 - entry_ts) / 3_600_000
+        except Exception as e:
+            logger.warning(f"Could not mark abandoned position to market: {e}")
+
+        logger.warning(
+            f"ABANDONED  {direction.upper()}  entry={entry:.2f}  qty={qty}"
+            + (f"  mark={mark:.2f}  unrealised={pnl_usdt:+.2f} USDT" if pnl_usdt is not None else "")
+            + "  — not closed, no P&L booked, not logged as a trade."
+        )
+        self.notifier.position_abandoned(
+            direction, entry, qty, self.mode, mark, pnl_pct, pnl_usdt, held_h
+        )
 
     # ── WebSocket loop ────────────────────────────────────────────────────────
 
@@ -521,6 +682,10 @@ class BBBot:
 
                     if len(self._closed_candles) >= MIN_HISTORY:
                         self._recompute_indicators()
+
+                    # Kept off the trade-exit path deliberately — see the
+                    # docstring. Self-throttles to FUNDING_REFRESH_MS.
+                    await self._refresh_funding_rates()
 
                     await self._on_candle_close()
 
@@ -803,14 +968,27 @@ class BBBot:
             fee_exit_rate=fee_exit,
         )
 
-        self.capital += pnl_usdt
+        # Funding is a cost of the trade like the taker/maker fees already in
+        # pnl_usdt, so it comes out of capital too. This is not just reporting:
+        # position size is 25% of capital, and capital compounds — leaving
+        # funding uncharged would size every later trade off a figure that is
+        # slightly too high, and the error accumulates.
+        entry_ts = self.state.get("pos_entry_ts")
+        funding_usdt, funding_windows = self._funding_cost(
+            direction, qty, entry, entry_ts, exit_ts
+        )
+        net_usdt = pnl_usdt - funding_usdt
+        self.capital += net_usdt
 
         logger.info(
             f"CLOSED ({reason})  {direction.upper()}  {entry:.2f}→{exit_price:.2f} | "
-            f"pnl={pnl_pct:+.2f}%  {pnl_usdt:+.2f} USDT  capital={self.capital:.2f}"
+            f"pnl={pnl_pct:+.2f}%  {pnl_usdt:+.2f} USDT  "
+            f"funding={funding_usdt:+.4f} ({funding_windows}w)  "
+            f"net={net_usdt:+.2f}  capital={self.capital:.2f}"
         )
         self.notifier.trade_closed(
-            direction, entry, exit_price, pnl_pct, pnl_usdt, reason, self.capital, self.mode
+            direction, entry, exit_price, pnl_pct, pnl_usdt, reason, self.capital, self.mode,
+            funding_usdt=funding_usdt, funding_windows=funding_windows, net_usdt=net_usdt,
         )
 
         try:
@@ -825,7 +1003,10 @@ class BBBot:
                 "quantity":  qty,
                 "reason":    reason,
                 "pnl_pct":   pnl_pct,
-                "pnl_usdt":  pnl_usdt,
+                "pnl_usdt":  pnl_usdt,          # net of trading fees, before funding
+                "funding_usdt":    round(funding_usdt, 6),
+                "funding_windows": funding_windows,
+                "net_usdt":        round(net_usdt, 6),   # what actually hit capital
                 "capital":   round(self.capital, 4),
             }, self.symbol_key)
         except Exception as e:

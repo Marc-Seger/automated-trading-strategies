@@ -28,9 +28,18 @@ This is not a signal-following bot. Every entry and exit here comes from indicat
 
 Frozen spec (2026-05-10), BTC/USDT perpetual futures on MEXC, 15-minute candles, 10x leverage, 25% position sizing, entry on a band touch confirmed by the EMA-150 trend, full spec in [`STRATEGY_SPEC.md`](STRATEGY_SPEC.md).
 
-- **290 trades, 63.8% win rate, +$10,348 net on a $1,000 starting balance over 11 months** (paper mode, compounding)
-- **Gate 1** (`research/audit_bb_channel.py`): a line-by-line audit of all 290 trades against the spec, passed
-- **Gate 2** (`research/gate2_grid_search.py`): a 16,200-combination parameter grid search, 67.5% of combinations were profitable, so the result isn't a cherry-picked lucky parameter set
+Backtest over a full year of real 15-minute data (2025-08 → 2026-08), 25% sizing, compounding, charging the fees the bot actually pays:
+
+- **311 trades, 60.5% win rate, +$730.45 on a $1,000 start (+73%), 20.1% max drawdown**
+- **Out-of-sample** (only data after the 2026-05-10 freeze, which the parameters never saw): **66 trades, 65.2% win rate, +$359.73, 10.1% max drawdown**
+- **Live paper bot**, running since 2026-08-04: 8 closed trades, +$102.23. Far too few to mean anything yet.
+
+**Fees dominate.** The same year with fees switched off returns +$3,078, so roughly three quarters of the gross edge goes to the exchange. At 10x a round trip costs ~1.2% of margin, which means a take-profit on a small move can still close at a net loss.
+
+- **Gate 1** (`research/gate1_audit.py`): calls `strategies/bb_channel.simulate` with no parameter overrides, so it can only ever measure the frozen constants the live bot imports from that same module.
+- **Gate 2** (`research/gate2_grid_search.py`): a 16,200-combination grid search, 67.5% of combinations profitable — the strategy family isn't balanced on a knife edge. Note the frozen set ranks 14th of 16,200 *on the window it was selected from*, so that ranking is a selection, not independent evidence. The out-of-sample figure above is the honest test.
+
+> **Superseded numbers.** This section previously read *290 trades, 63.8% win rate, +$10,348*. That came from a standalone audit script that had drifted from the deployed strategy on five counts, each one flattering: SL snap 85% vs 95%, EMA-200 vs EMA-150, 100% of capital per trade vs 25%, maker fees on both legs when entry and take-profit are market orders, and a win counted as a take-profit exit rather than a net gain. It measured a configuration that was never deployed. Corrected 2026-08-12; the old script is deleted and Gate 1 now imports the live strategy module directly.
 
 The other four strategies share the same backtest engine and dashboard but haven't been through this level of validation, they're there to build and test, not to trust blindly.
 

@@ -134,6 +134,115 @@ def _save_disk_ind_cache(symbol: str, timeframe: str, candles: list) -> None:
         json.dump({"candles": candles}, f)
 
 
+# --- Funding rates -----------------------------------------------------------
+# Perpetual swaps charge funding at fixed settlement times (every 8h on MEXC).
+# bb_bot.py does not model this at all: its P&L covers the price move and the
+# taker/maker fees only. Funding is small here (measured 2026-08-10: ~0.005% per
+# 8h on average, ~$0.37 over the longest 22h trade against $34 of P&L) but it is
+# a real, systematic cost — it scales with notional x holding time rather than
+# with profit, and it is always a debit for a long while the rate is positive,
+# which is the normal state in a rising market.
+#
+# Computed here rather than stored by the bot, matching how fee_usdt /
+# gross_pnl_usdt are reconstructed below: the trade log keeps only what actually
+# happened, and derived figures are recomputed on read so they apply
+# retroactively to every trade already on record.
+_FUNDING_CACHE  = {}                 # symbol -> {"fetched_ms": int, "rates": [...]}
+_FUNDING_TTL_MS = 30 * 60_000        # settles every 8h, so half-hourly is ample
+
+
+def _funding_cache_path(symbol: str) -> str:
+    safe = symbol.replace("/", "_").replace(":", "_")
+    return os.path.join(_IND_CACHE_DIR, f"funding_{safe}.json")
+
+
+def _get_funding_rates(symbol: str) -> list:
+    """
+    Funding settlements as [{"ts": ms, "rate": float}], oldest first.
+
+    Cached hard on purpose. /api/bb_bot_status is polled every 15s and Flask
+    here is single-threaded, so an uncached exchange call on this path would
+    recreate the conditions that took the VPS down on 2026-08-08. At most one
+    refresh per _FUNDING_TTL_MS, and any failure falls back to the last good
+    data (memory, then disk, then nothing) — funding detail is worth degrading,
+    never worth failing the whole dashboard for.
+    """
+    now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+    entry  = _FUNDING_CACHE.get(symbol)
+
+    if entry is None:                                  # cold process: try disk
+        try:
+            path = _funding_cache_path(symbol)
+            if os.path.exists(path):
+                with open(path) as f:
+                    entry = json.load(f)
+                _FUNDING_CACHE[symbol] = entry
+        except Exception:
+            entry = None
+
+    if entry and now_ms - entry.get("fetched_ms", 0) < _FUNDING_TTL_MS:
+        return entry.get("rates", [])
+
+    try:
+        ex  = _get_mexc_exchange()
+        sym = symbol if ":" in symbol else symbol + ":USDT"
+        raw = ex.fetch_funding_rate_history(sym, limit=200)
+        rates = sorted(
+            ({"ts": int(r["timestamp"]), "rate": float(r["fundingRate"])}
+             for r in raw
+             if r.get("timestamp") is not None and r.get("fundingRate") is not None),
+            key=lambda r: r["ts"],
+        )
+        if rates:
+            entry = {"fetched_ms": now_ms, "rates": rates}
+            _FUNDING_CACHE[symbol] = entry
+            try:
+                with open(_funding_cache_path(symbol), "w") as f:
+                    json.dump(entry, f)
+            except Exception:
+                pass
+            return rates
+    except Exception as e:
+        logger.warning(f"Funding rate fetch failed for {symbol}: {e}")
+
+    return (entry or {}).get("rates", [])
+
+
+def _trade_funding_usdt(trade: dict, rates: list, price_at, contract_lot: float):
+    """
+    Funding COST for one trade in USDT — positive means paid out, negative
+    means received — plus the number of settlements it was charged over.
+
+    A position is charged if it is open when a settlement lands, so the window
+    is (entry_ts, exit_ts]: a trade opened exactly at a settlement has not held
+    through it, one closed exactly at a settlement has. When the rate is
+    positive longs pay shorts, hence the sign flip for shorts. Notional is
+    marked at the price when each settlement actually occurred rather than at
+    entry, since that is what the exchange charges against; entry price is the
+    fallback when no candle covers that moment.
+
+    Returns (None, 0) when the rate history does not cover the trade, so the UI
+    can distinguish "no funding" from "not known".
+    """
+    entry_ts, exit_ts = trade.get("entry_ts"), trade.get("exit_ts")
+    entry, qty = trade.get("entry"), trade.get("quantity")
+    if None in (entry_ts, exit_ts, entry, qty) or not rates:
+        return None, 0
+    if entry_ts < rates[0]["ts"] or exit_ts > rates[-1]["ts"] + 8 * 3600_000:
+        return None, 0                                  # outside known history
+
+    is_long = trade.get("direction") == "long"
+    total, n = 0.0, 0
+    for r in rates:
+        if not (entry_ts < r["ts"] <= exit_ts):
+            continue
+        px  = price_at(r["ts"]) or entry
+        pay = qty * px * contract_lot * r["rate"]        # long pays when rate > 0
+        total += pay if is_long else -pay
+        n += 1
+    return total, n
+
+
 def _merge_ind_candles(existing: list, new: list) -> list:
     by_ts = {c[0]: c for c in existing}
     for c in new:
@@ -238,11 +347,51 @@ def ensure_indicator_candles(
                 raise
 
         if new_candles:
-            merged = _merge_ind_candles(cached, new_candles)
-            INDICATOR_OHLCV_CACHE.setdefault(symbol, {})[timeframe] = merged
-            _save_disk_ind_cache(symbol, timeframe, merged)
-            logger.info(f"Gap fill complete: {symbol} {timeframe} +{len(new_candles)} candles (total: {len(merged)})")
-            cached = merged
+            # NEVER persist a candle that hasn't closed yet.
+            #
+            # A candle fetched mid-formation holds only the trading so far, so
+            # its high/low/close are provisional. The cache treats any timestamp
+            # it already holds as settled and never rechecks it, so a provisional
+            # candle written once stays wrong permanently. force_tail_ms above
+            # re-fetches the trailing couple of candles, but that is a sliding
+            # window: as soon as polling stops (browser closed, session over),
+            # whatever partial was last written falls outside it and is stranded.
+            # A 7-day audit on 2026-08-10 found 2 genuinely corrupted candles
+            # this way — one stuck at O=H=L=C, another with its high understated
+            # by $231 — which silently misdrew the chart and fed the backtest.
+            #
+            # Excluding unclosed candles from the *write* removes the cause
+            # rather than chasing it: a partial can never enter the cache. It is
+            # still returned to the caller, so the live forming candle keeps
+            # showing on the chart; it just gets re-fetched each time until it
+            # closes, at which point it is stored complete.
+            now_ms  = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+            closed  = [c for c in new_candles if c[0] + tf_ms <= now_ms]
+            forming = [c for c in new_candles if c[0] + tf_ms >  now_ms]
+
+            if closed:
+                # Filter the MERGED result, not just the incoming candles.
+                # Excluding only `new_candles` is not enough: a provisional
+                # candle already sitting in the cache (written by an older
+                # build, or by this process before it closed) rides along
+                # inside `merged` and gets written straight back out. Filtering
+                # here means the persisted file can never hold an unclosed
+                # candle whatever its origin, and legacy ones are evicted the
+                # first time this path runs.
+                merged = [c for c in _merge_ind_candles(cached, closed)
+                          if c[0] + tf_ms <= now_ms]
+                INDICATOR_OHLCV_CACHE.setdefault(symbol, {})[timeframe] = merged
+                _save_disk_ind_cache(symbol, timeframe, merged)
+                logger.info(
+                    f"Gap fill complete: {symbol} {timeframe} +{len(closed)} candles "
+                    f"(total: {len(merged)}"
+                    + (f", {len(forming)} still forming, not cached)" if forming else ")")
+                )
+                cached = merged
+            if forming:
+                # Returned but not stored — _merge_ind_candles builds a new list,
+                # so the cached/in-memory copy above stays closed-candles-only.
+                cached = _merge_ind_candles(cached, forming)
 
     return cached
 
@@ -632,28 +781,85 @@ def api_bb_bot_status():
         t["gross_pnl_usdt"] = round(gross_pnl_usdt, 4)
         t["fee_usdt"] = round(gross_pnl_usdt - pnl_usdt, 4)
 
-    # --- Stats ---
-    closed = [t for t in trades if t.get("reason") != "open"]
-    wins   = [t for t in closed if t.get("pnl_usdt", 0) > 0]
-    losses = [t for t in closed if t.get("pnl_usdt", 0) <= 0]
+    # --- Funding (perp cost the bot does not book) ---
+    # Marked against the 15m close at each settlement, read straight from the
+    # existing OHLCV cache — no extra fetch, and no candle is ever added by
+    # this path. Silently degrades to no funding fields if either the rate
+    # history or the candle cache is unavailable.
+    try:
+        f_rates = _get_funding_rates(f"{symbol}/USDT")
+        f_candles = _load_disk_ind_cache(f"{symbol}/USDT", _SIGNAL_TIMEFRAME)
+        tf_ms = _TF_MS[_SIGNAL_TIMEFRAME]
+        by_bucket = {c[0]: c[4] for c in f_candles}
 
-    total_pnl   = round(sum(t.get("pnl_usdt", 0) for t in closed), 2)
+        def _price_at(ms):
+            return by_bucket.get((ms // tf_ms) * tf_ms)
+
+        for t in trades:
+            # Trades closed by a bot build that charges funding store it (and
+            # already took it out of capital) — that is authoritative. Older
+            # trades predate it, so funding is reconstructed for them here.
+            if t.get("funding_usdt") is None:
+                fund, n = _trade_funding_usdt(t, f_rates, _price_at, CONTRACT_LOT)
+                if fund is None:
+                    continue
+                t["funding_usdt"] = round(fund, 4)
+                t["funding_windows"] = n
+                t["funding_charged"] = False    # not deducted from capital at the time
+            else:
+                t["funding_charged"] = True
+            if t.get("pnl_usdt") is not None:
+                t["pnl_after_funding_usdt"] = round(t["pnl_usdt"] - t["funding_usdt"], 4)
+    except Exception as e:
+        logger.warning(f"Funding enrichment skipped: {e}")
+
+    # --- Stats ---
+    # Funding is a cost of the trade exactly like the taker/maker fees already
+    # inside pnl_usdt, so every headline figure below is net of it: P&L, win
+    # rate, avg win/loss. A trade whose funding eats its profit is a loss.
+    def _net(t):
+        return (t.get("pnl_usdt") or 0) - (t.get("funding_usdt") or 0)
+
+    closed = [t for t in trades if t.get("reason") != "open"]
+    wins   = [t for t in closed if _net(t) > 0]
+    losses = [t for t in closed if _net(t) <= 0]
+
+    total_gross_pnl = round(sum(t.get("pnl_usdt", 0) for t in closed), 2)
+    total_funding   = round(sum(t.get("funding_usdt", 0) or 0 for t in closed), 4)
+    total_pnl       = round(sum(_net(t) for t in closed), 2)
+    # Every cost the strategy paid: taker/maker on both legs (already inside
+    # pnl_usdt, reconstructed per trade above) plus perp funding.
+    total_exchange_fees = round(sum(t.get("fee_usdt", 0) or 0 for t in closed), 4)
+    total_costs         = round(total_exchange_fees + total_funding, 4)
+    funding_known   = sum(1 for t in closed if t.get("funding_usdt") is not None)
+    # Trades closed before the bot charged funding had it reconstructed after
+    # the fact, so their `capital` figures — and the bot's running capital —
+    # never had it deducted. Surfaced so the UI can explain why Total P&L and
+    # Capital differ by exactly this much until those trades age out.
+    uncharged_funding = round(
+        sum(t.get("funding_usdt", 0) or 0 for t in closed if not t.get("funding_charged")), 4)
     win_rate    = round(len(wins) / len(closed) * 100, 1) if closed else 0.0
-    avg_win     = round(sum(t.get("pnl_usdt", 0) for t in wins)   / len(wins),   2) if wins   else 0.0
-    avg_loss    = round(sum(t.get("pnl_usdt", 0) for t in losses) / len(losses), 2) if losses else 0.0
+    avg_win     = round(sum(_net(t) for t in wins)   / len(wins),   2) if wins   else 0.0
+    avg_loss    = round(sum(_net(t) for t in losses) / len(losses), 2) if losses else 0.0
 
     # --- Equity curve (compounded, timestamps from trade exit_ts or entry_ts) ---
     starting_capital = float(state.get("capital", 0) or 0)
-    # Walk trades in order to rebuild the equity series
+    # Accumulated from each trade's NET result rather than read off its stored
+    # `capital` field. Those stored values are the bot's running capital at the
+    # time, which for trades closed before it charged funding excludes it — so
+    # replaying them would end at a different number than the bot's (trued-up)
+    # capital, and would give a max drawdown that disagrees with the
+    # funding-aware avg win/loss beside it. Accumulating _net keeps the equity
+    # curve, Total P&L and Capital all consistent.
     equity = []
     cap = None
     for t in trades:
         if cap is None:
-            # Infer starting capital from first trade
-            cap = t.get("capital", 0) - t.get("pnl_usdt", 0)
+            # Infer starting capital from the first trade
+            cap = (t.get("capital", 0) or 0) - (t.get("pnl_usdt", 0) or 0)
             equity.append({"ts": t.get("entry_ts", 0), "capital": round(cap, 2)})
         ts = t.get("exit_ts") or t.get("entry_ts", 0)
-        cap = t.get("capital", cap)
+        cap += _net(t)
         equity.append({"ts": ts, "capital": round(cap, 2)})
 
     # --- Max drawdown on equity series ---
@@ -682,7 +888,13 @@ def api_bb_bot_status():
             "wins":          len(wins),
             "losses":        len(losses),
             "win_rate":      win_rate,
-            "total_pnl":     total_pnl,
+            "total_pnl":       total_pnl,           # net of fees AND funding
+            "total_gross_pnl": total_gross_pnl,     # as the bot booked it
+            "total_funding":   total_funding,
+            "total_exchange_fees": total_exchange_fees,
+            "total_costs":         total_costs,       # exchange fees + funding
+            "funding_known_trades": funding_known,
+            "uncharged_funding":    uncharged_funding,
             "avg_win":       avg_win,
             "avg_loss":      avg_loss,
             "max_drawdown":  max_dd,
@@ -706,6 +918,24 @@ def api_bb_bot_status():
 _LIVE_CHART_RESOLUTIONS = ["15m", "1h", "4h", "1d", "1w"]
 _LIVE_CHART_MAX_CANDLES = 500
 
+# The timeframe bb_bot.py actually trades on. The Live Bot chart is an audit
+# view of the bot's decisions, so its BB/EMA should be the bands the bot used
+# — not bands recomputed at whatever candle resolution happens to be on screen.
+# Above ~5.2 days the display drops to 1h+ candles (the 500-candle cap), and
+# resolution-matched bands there are a different indicator entirely: markers
+# stop landing on the band and correct entries look wrong.
+#
+# Capped by span because the override means fetching 15m data for the whole
+# window regardless of display resolution: 14 days is ~1,344 candles (plus
+# warmup), a few paged fetches against an on-disk cache. Beyond that the cost
+# climbs fast (a year would be ~35k candles) while the value falls away — you
+# are no longer auditing an individual signal. The cap also keeps this visually
+# sane: within 14 days the display is at most 1h, so a 15m band is 4 points per
+# candle, never the hairball it would be under 1d candles.
+_SIGNAL_TIMEFRAME             = "15m"
+_SIGNAL_INDICATOR_MAX_SPAN_MS = 14 * 24 * 3600 * 1000
+
+
 def _timeframe_for_span(span_ms: int) -> str:
     for tf in _LIVE_CHART_RESOLUTIONS:
         if span_ms / _TF_MS[tf] <= _LIVE_CHART_MAX_CANDLES:
@@ -716,9 +946,23 @@ def _timeframe_for_span(span_ms: int) -> str:
 @app.route("/api/live_chart")
 def api_live_chart():
     """
-    Return OHLCV + BB(20,3.0) + EMA(150) for the live bot price chart, at a
-    candle resolution auto-selected from the requested span (15m up to 24h,
-    1h up to 3 days, 4h up to 10 days, 1d up to a year, 1w beyond that).
+    Return OHLCV + BB(20,3.0) + EMA(150) for the live bot price chart.
+
+    Candle resolution is auto-selected from the requested span: the finest of
+    15m/1h/4h/1d/1w whose candle count stays within _LIVE_CHART_MAX_CANDLES.
+
+    Indicators are computed on _SIGNAL_TIMEFRAME (15m — what the bot actually
+    trades) whenever the span is within _SIGNAL_INDICATOR_MAX_SPAN_MS, even if
+    the displayed candles are coarser, so the bands on screen are the bands the
+    bot signalled on. Beyond that cap they fall back to the display resolution
+    and become a chart-only overlay. `indicator_timeframe` in the response says
+    which happened, so the frontend can label it honestly.
+
+    Because the indicator series can be finer than the candles, it ships with
+    its own `indicator_ts` timestamps rather than being aligned index-by-index
+    to `candles` — downsampling it onto candle timestamps would drop 3 of every
+    4 points at 1h and break the property that a marker sits on the band.
+
     Uses the same gap-filling indicator cache as the indicator backtest tab.
 
     Query params:
@@ -767,58 +1011,85 @@ def api_live_chart():
     if to_ms <= from_ms:
         return jsonify({"error": "to must be after from"}), 400
 
-    timeframe = _timeframe_for_span(resolution_span_ms if resolution_span_ms is not None else to_ms - from_ms)
+    span_ms   = resolution_span_ms if resolution_span_ms is not None else to_ms - from_ms
+    timeframe = _timeframe_for_span(span_ms)
     candle_ms = _TF_MS[timeframe]
-
-    warmup_ms  = max(BB_PERIOD, TREND_PERIOD) * candle_ms   # candles needed to seed indicators
-    fetch_from = from_ms - warmup_ms * 3                    # generous extra buffer
 
     # A request tracking "now" (to_ms within one candle of the real current
     # time) is a live-tracking view — force a re-fetch of the last 2 candles
     # on every call so the forming candle and the most-recently-closed one
     # never sit frozen on a stale first-fetch snapshot (see docstring above).
     is_live_request = to_ms >= now_ms - candle_ms
-    force_tail_ms    = candle_ms * 2 if is_live_request else 0
+
+    def _load(tf: str) -> list:
+        tf_ms  = _TF_MS[tf]
+        warmup = max(BB_PERIOD, TREND_PERIOD) * tf_ms * 3   # generous seed buffer
+        return ensure_indicator_candles(
+            ccxt_sym, tf, from_ms - warmup, to_ms,
+            force_tail_ms=tf_ms * 2 if is_live_request else 0,
+        )
 
     try:
-        candles = ensure_indicator_candles(ccxt_sym, timeframe, fetch_from, to_ms, force_tail_ms=force_tail_ms)
+        candles = _load(timeframe)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
     if not candles:
         return jsonify({"error": f"No OHLCV data for {ccxt_sym}"}), 404
 
-    bb_series  = compute_bb(candles, BB_PERIOD, BB_STD)
-    ema_series = compute_ema(candles, TREND_PERIOD)
+    # Indicators on the bot's own signal timeframe when the span allows it, so
+    # the bands drawn are the bands the bot signalled on. Degrades to the
+    # display resolution if that extra fetch fails — a chart labelled
+    # display-only beats no chart at all.
+    indicator_tf = timeframe
+    ind_candles  = candles
+    if timeframe != _SIGNAL_TIMEFRAME and span_ms <= _SIGNAL_INDICATOR_MAX_SPAN_MS:
+        try:
+            signal_candles = _load(_SIGNAL_TIMEFRAME)
+            if signal_candles:
+                ind_candles, indicator_tf = signal_candles, _SIGNAL_TIMEFRAME
+        except Exception as e:
+            logger.warning(
+                f"Signal-timeframe indicators unavailable, falling back to {timeframe}: {e}"
+            )
+
+    bb_series  = compute_bb(ind_candles, BB_PERIOD, BB_STD)
+    ema_series = compute_ema(ind_candles, TREND_PERIOD)
 
     # Only ship the display window to the client (warmup stays server-side)
     display_from_ms = from_ms - candle_ms * 10   # 10 candle grace on left edge
-    out_candles  = []
+    out_candles = [c for c in candles if display_from_ms <= c[0] <= to_ms]
+
+    # Indicator series carries its own timestamps — it can be finer than the
+    # candles (15m bands under 1h candles), so it is not index-parallel to them.
+    out_ind_ts   = []
     out_bb_upper = []
     out_bb_mid   = []
     out_bb_lower = []
     out_ema      = []
-
-    for i, c in enumerate(candles):
+    for i, c in enumerate(ind_candles):
         if c[0] < display_from_ms or c[0] > to_ms:
             continue
-        out_candles.append(c)
         bb = bb_series[i]
+        out_ind_ts  .append(c[0])
         out_bb_upper.append(bb[0] if bb else None)
         out_bb_mid  .append(bb[1] if bb else None)
         out_bb_lower.append(bb[2] if bb else None)
         out_ema     .append(ema_series[i])
 
     return jsonify({
-        "candles":   out_candles,
-        "bb_upper":  out_bb_upper,
-        "bb_mid":    out_bb_mid,
-        "bb_lower":  out_bb_lower,
-        "ema":       out_ema,
-        "timeframe": timeframe,
-        "from_ms":   from_ms,
-        "to_ms":     to_ms,
-        "now_ms":    now_ms,
+        "candles":             out_candles,
+        "indicator_ts":        out_ind_ts,
+        "bb_upper":            out_bb_upper,
+        "bb_mid":              out_bb_mid,
+        "bb_lower":            out_bb_lower,
+        "ema":                 out_ema,
+        "timeframe":           timeframe,
+        "indicator_timeframe": indicator_tf,
+        "signal_timeframe":    _SIGNAL_TIMEFRAME,
+        "from_ms":             from_ms,
+        "to_ms":               to_ms,
+        "now_ms":              now_ms,
     })
 
 

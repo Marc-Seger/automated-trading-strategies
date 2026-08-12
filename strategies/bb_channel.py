@@ -316,7 +316,7 @@ def simulate(
     sl_pct:           float = SL_PCT,   # overridable via params["sl_pct"] or this arg
     tp_pct:           float = 0.10,     # ignored — TP is always the opposite band
     leverage:         int   = 10,
-    fee_rate:         float = FEE_MAKER,  # default = 0.04% maker (validated spec); UI can override
+    fee_rate:         Optional[float] = None,  # None = live-accurate per-leg model; a float = both legs at that rate
     starting_capital: float = 1000.0,
 ) -> list[dict]:
     """
@@ -327,14 +327,22 @@ def simulate(
     a key is absent. The live bot (bb_bot.py) imports the module-level
     constants directly and never calls this function.
 
-    Fee model (dashboard-controllable via fee_rate arg):
-      - fee_rate is applied to BOTH the entry leg and the exit leg.
-      - Default: FEE_MAKER = 0.04% per leg (matches validated backtest — all orders
-        are limit/stop-limit so maker fee applies everywhere).
-      - Selecting "Taker" in the UI passes 0.0006 — useful for worst-case stress test.
-      - Selecting "None" passes 0.0 — fee-free baseline.
-      - The live bot uses FEE_MAKER for all limit fills and FEE_TAKER only for the
-        rare backstop market order; that distinction is live-only, not modelled here.
+    Fee model:
+      - fee_rate=None (default) — model what the live bot actually pays, per leg:
+            entry            → FEE_TAKER (0.06%), bb_bot.py enters with a market order
+            exit via TP band → FEE_TAKER (0.06%), bb_bot.py closes TP with a market order
+            exit via SL      → FEE_MAKER (0.04%), the stop-limit fills as a maker
+        The stop-market backstop (also taker) only fires when price gaps through the
+        stop-limit; it is rare and not modelled, so SL exits are costed at the
+        optimistic maker rate.
+      - fee_rate=<float> — override, applied to BOTH legs. Used by the dashboard's
+        fee dropdown (none / spot / api_maker / api_taker) for what-if comparisons.
+
+      This previously defaulted to FEE_MAKER on both legs, with a docstring claiming
+      "all orders are limit/stop-limit so maker fee applies everywhere". That was
+      wrong: entry and TP exit are both market orders. At 10x the understatement is
+      material — a real trade on 2026-08-09 closed at -$1.66 despite exiting above
+      entry, purely because taker fees on both legs exceeded a +0.058% raw move.
 
     Key mechanics:
       - SL  = sl_pct from entry (default 1%); params["sl_pct"] overrides
@@ -472,14 +480,20 @@ def simulate(
                 # outcome from P&L sign (handles band-drift edge case)
                 outcome  = "take_profit" if raw_move > 0 else "stop_loss"
 
-                # Both legs use the user-selected fee_rate (maker/taker/none from UI).
-                # The live bot has a more granular split but the backtest uses a
-                # single rate per leg for simplicity and UI controllability.
+                # fee_rate=None → mirror the live bot leg by leg (market entry and
+                # market TP close are taker; the stop-limit SL fills as maker).
+                # An explicit fee_rate overrides both legs, for dashboard what-ifs.
+                if fee_rate is None:
+                    _fee_entry = FEE_TAKER
+                    _fee_exit  = FEE_MAKER if exit_trigger == "sl" else FEE_TAKER
+                else:
+                    _fee_entry = _fee_exit = fee_rate
+
                 pnl_pct, pnl_usdt = calc_pnl(
                     direction, entry_price, exit_price,
                     leverage, capital, sizing_pct,
-                    fee_entry_rate=fee_rate,
-                    fee_exit_rate=fee_rate,
+                    fee_entry_rate=_fee_entry,
+                    fee_exit_rate=_fee_exit,
                 )
                 dur_h = round((ts - entry_ts_ms) / 3_600_000, 2)
 
@@ -501,7 +515,7 @@ def simulate(
                     "pnl_pct":        pnl_pct,
                     "pnl_usdt":       pnl_usdt,
                     "gross_pnl_pct":  round(raw_move * leverage * 100, 4),
-                    "fee_pct":        round(fee_rate * 2 * leverage * 100, 4),
+                    "fee_pct":        round((_fee_entry + _fee_exit) * leverage * 100, 4),
                     "price_move_pct": round(raw_move * 100, 2),
                     "leverage":       leverage,
                     "duration_hours": dur_h,
@@ -551,10 +565,11 @@ def simulate(
             if direction == "long"
             else (entry_price - last[4]) / entry_price
         )
+        _fee_entry_open = FEE_TAKER if fee_rate is None else fee_rate
         pnl_pct, pnl_usdt = calc_pnl(
             direction, entry_price, last[4],
             leverage, capital, sizing_pct,
-            fee_entry_rate=fee_rate,
+            fee_entry_rate=_fee_entry_open,
             fee_exit_rate=0.0,   # exit not yet realised
         )
         entry_bb    = bb_series[entry_idx]
@@ -573,7 +588,7 @@ def simulate(
             "pnl_pct":        pnl_pct,
             "pnl_usdt":       pnl_usdt,
             "gross_pnl_pct":  round(raw_move * leverage * 100, 4),
-            "fee_pct":        round(fee_rate * leverage * 100, 4),   # entry leg only
+            "fee_pct":        round(_fee_entry_open * leverage * 100, 4),   # entry leg only
             "price_move_pct": round(raw_move * 100, 2),
             "leverage":       leverage,
             "duration_hours": round((last[0] - entry_ts_ms) / 3_600_000, 2),

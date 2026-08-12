@@ -575,8 +575,8 @@
         <div class="flex justify-between bg-gray-800 rounded px-3 py-2"><span class="text-gray-400">Leverage</span><span class="text-gray-100 font-mono">10×</span></div>
       </div>
       <div class="mt-3 pt-3 border-t border-gray-700 text-xs flex flex-wrap gap-x-6 gap-y-1">
-        <span class="text-gray-500">Audit: 290 trades · 11 months · 0.04% maker fee</span>
-        <span><span class="text-emerald-400 font-semibold">185W / 105L</span> <span class="text-gray-400">· 63.8% WR · +$10,348 net (100% compounding)</span></span>
+        <span class="text-gray-500">Gate 1: 311 trades · 12 months · live-accurate fees · 25% sizing</span>
+        <span><span class="text-emerald-400 font-semibold">60.5% WR</span> <span class="text-gray-400">· +$730.45 net · 20.1% max DD · out-of-sample since freeze: 65.2% WR, +$359.73</span></span>
       </div>
     </div>
 
@@ -586,10 +586,10 @@
     <div class="space-y-2 mb-3">
       <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3 text-xs"><span class="font-semibold text-gray-200">Avg funding rate</span><span class="text-gray-400">+0.003% per 8h period over the 11-month backtest window</span></div>
       <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3 text-xs"><span class="font-semibold text-gray-200">Avg hold time</span><span class="text-gray-400">~2.1h — most positions close before the next 8h settlement window</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3 text-xs"><span class="font-semibold text-gray-200">Total drag (11 months)</span><span class="text-yellow-300 font-mono">−$47.84 on a $1,000 starting account</span></div>
+      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3 text-xs"><span class="font-semibold text-gray-200">Total drag</span><span class="text-yellow-300 font-mono">−$47.84 — measured on the superseded 100%-sizing baseline; scales with sizing, so ≈−$12 at the frozen 25%</span></div>
     </div>
     <div class="bg-emerald-950 border border-emerald-800 rounded p-3 text-xs text-emerald-300 mb-6">
-      ✓ Verdict: negligible — funding fees do not materially affect the strategy at 15m hold times.
+      ✓ Verdict: negligible — funding does not materially affect the strategy at ~2h hold times. Taker fees, not funding, are the cost that matters: they consume roughly three quarters of the gross edge.
     </div>
 
     <!-- 2. Sizing Sweep -->
@@ -606,17 +606,29 @@
           </tr>
         </thead>
         <tbody>
+          <tr class="bg-gray-900/60 border-t border-gray-800">
+            <td class="px-4 py-2 text-gray-300 border border-gray-800">10% of capital per trade</td>
+            <td class="px-4 py-2 text-right font-mono text-emerald-300 border border-gray-800">+$273.92</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">8.45%</td>
+            <td class="px-4 py-2 text-right font-mono text-yellow-300 border border-gray-800">3.24</td>
+          </tr>
           <tr class="bg-gray-900 border-t border-gray-800">
-            <td class="px-4 py-2 text-gray-300 border border-gray-800">100% compounding — audit baseline</td>
-            <td class="px-4 py-2 text-right font-mono text-emerald-300 border border-gray-800">+$10,348</td>
-            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">$5,991</td>
-            <td class="px-4 py-2 text-right font-mono text-yellow-300 border border-gray-800">1.73</td>
+            <td class="px-4 py-2 text-gray-300 border border-gray-800">25% — <span class="text-emerald-400">frozen spec, live bot</span></td>
+            <td class="px-4 py-2 text-right font-mono text-emerald-300 border border-gray-800">+$730.45</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">20.13%</td>
+            <td class="px-4 py-2 text-right font-mono text-yellow-300 border border-gray-800">3.63</td>
           </tr>
           <tr class="bg-gray-900/60 border-t border-gray-800">
-            <td class="px-4 py-2 text-gray-300 border border-gray-800">Flat $1k / trade (no compounding)</td>
-            <td class="px-4 py-2 text-right font-mono text-emerald-300 border border-gray-800">+$3,900</td>
-            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">$838</td>
-            <td class="px-4 py-2 text-right font-mono text-emerald-400 font-bold border border-gray-800">4.65</td>
+            <td class="px-4 py-2 text-gray-300 border border-gray-800">50% of capital per trade</td>
+            <td class="px-4 py-2 text-right font-mono text-emerald-300 border border-gray-800">+$1,481.09</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">37.53%</td>
+            <td class="px-4 py-2 text-right font-mono text-emerald-400 font-bold border border-gray-800">3.95</td>
+          </tr>
+          <tr class="bg-gray-900/60 border-t border-gray-800">
+            <td class="px-4 py-2 text-gray-300 border border-gray-800">100% of capital per trade</td>
+            <td class="px-4 py-2 text-right font-mono text-emerald-300 border border-gray-800">+$1,919.11</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">66.81%</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">2.87</td>
           </tr>
         </tbody>
       </table>
@@ -957,12 +969,21 @@
       <span id="live-stat-wr" class="text-xl font-bold text-gray-100">—</span>
     </div>
     <div class="bg-gray-900 rounded-xl px-5 py-3 flex flex-col gap-0.5 min-w-32">
+      <!-- Net of trading fees AND funding, on every trade including those
+           closed before the bot charged funding. -->
       <span class="text-xs text-gray-500 uppercase tracking-wide">Total P&amp;L</span>
       <span id="live-stat-pnl" class="text-xl font-bold text-gray-100">—</span>
     </div>
     <div class="bg-gray-900 rounded-xl px-5 py-3 flex flex-col gap-0.5 min-w-36">
       <span class="text-xs text-gray-500 uppercase tracking-wide">Capital</span>
       <span id="live-stat-capital" class="text-xl font-bold text-gray-100">—</span>
+    </div>
+    <div class="bg-gray-900 rounded-xl px-5 py-3 flex flex-col gap-0.5 min-w-36">
+      <span class="text-xs text-gray-500 uppercase tracking-wide">Fees Paid</span>
+      <span id="live-stat-fees" class="text-xl font-bold text-amber-500">—</span>
+      <!-- Split shown because the two behave very differently: exchange fees
+           are per-trade and dominate, funding scales with holding time. -->
+      <span id="live-stat-fees-split" class="text-[10px] text-gray-500 leading-tight"></span>
     </div>
     <div class="bg-gray-900 rounded-xl px-5 py-3 flex flex-col gap-0.5 min-w-32">
       <span class="text-xs text-gray-500 uppercase tracking-wide">Avg Win</span>
@@ -987,6 +1008,18 @@
         <span class="text-yellow-400">EMA-150</span>
       </span>
       <div class="flex items-center gap-1.5 text-xs text-gray-400">
+        <!-- Rolling quick ranges: re-anchored to "now" on every refresh, so
+             they slide rather than stretch. The date inputs below are
+             day-granular and can't express a sub-day window. -->
+        <button id="live-range-4h" data-hours="4" onclick="liveApplyQuickRange(4)"
+          class="live-quick-btn px-2 py-0.5 rounded border border-gray-700 font-semibold hover:border-indigo-500">
+          4H
+        </button>
+        <button id="live-range-12h" data-hours="12" onclick="liveApplyQuickRange(12)"
+          class="live-quick-btn px-2 py-0.5 rounded border border-gray-700 font-semibold hover:border-indigo-500">
+          12H
+        </button>
+        <span class="text-gray-700 px-1">|</span>
         <span>From</span>
         <input type="date" id="live-chart-from"
           class="bg-gray-800 border border-gray-700 text-gray-100 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-indigo-500">
@@ -1060,6 +1093,7 @@
             <th class="px-3 py-2 text-center">Reason</th>
             <th class="px-3 py-2 text-right">P&amp;L%</th>
             <th class="px-3 py-2 text-right">Fees</th>
+            <th class="px-3 py-2 text-right">Funding</th>
             <th class="px-3 py-2 text-right">P&amp;L $</th>
             <th class="px-3 py-2 text-right">Capital After</th>
             <th class="px-3 py-2 text-left">Exit Time (UTC)</th>
@@ -1763,6 +1797,39 @@ let _indSyncing = false;
 let _indMarkerRebuildTimer = null;   // debounce handle for marker rebuilds
 const _indWheelListeners = [];  // track listeners so we can remove on re-render
 
+// Chart.js's date adapter formats in the BROWSER's timezone, so a `tooltipFormat`
+// string renders local time no matter what it says. The Live Bot chart's format
+// even appended the literal word "UTC" to it, actively mislabelling the result —
+// a CEST viewer saw the 22:00 UTC candle titled "2026-08-10 00:00 UTC", two hours
+// out, while the axis beneath it correctly read 22:00. Axis ticks were always
+// right because they go through _fmtUtcTick instead of the adapter.
+//
+// The adapter as loaded has no timezone option, so every time tooltip needs an
+// explicit title callback using this. Everything user-facing is UTC: the axes,
+// the trade tables, the bot's logs, and the Telegram alerts.
+function _fmtUtcStamp(ms) {
+  const d = new Date(ms);
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} `
+       + `${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
+}
+
+function _fmtUtcHm(ms) {
+  const d = new Date(ms);
+  const p = n => String(n).padStart(2, "0");
+  return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
+}
+
+// Length in ms of the bot's signal candle ("15m"), from the server's
+// signal_timeframe. 0 until the first chart load.
+let _liveSignalMs = 0;
+function _tfToMs(tf) {
+  const m = /^(\d+)([mhdw])$/.exec(String(tf || ""));
+  if (!m) return 0;
+  const n = Number(m[1]);
+  return n * ({ m: 60e3, h: 3600e3, d: 86400e3, w: 604800e3 }[m[2]] || 0);
+}
+
 function _fmtUtcTick(ms, unit) {
   const d  = new Date(ms);
   const mo = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1950,7 +2017,8 @@ function renderIndChart(data) {
 
   const sharedTimeOpts = {
     unit: initUnit,
-    tooltipFormat: "dd MMM yyyy HH:mm",
+    // No tooltipFormat — it would render in local time. Tooltip titles go
+    // through _fmtUtcStamp so every timestamp on screen is UTC.
     displayFormats: { minute:"HH:mm", hour:"dd MMM HH:mm", day:"dd MMM", week:"dd MMM yyyy", month:"MMM yyyy" },
   };
 
@@ -2118,7 +2186,9 @@ function renderIndChart(data) {
       options:{
         responsive:true, maintainAspectRatio:false, animation:false,
         interaction:{ mode:"nearest", intersect:true },
-        plugins:{ legend:{ display:false }, tooltip:{ enabled:true }, zoom: zoomPlugin },
+        plugins:{ legend:{ display:false },
+          tooltip:{ enabled:true, callbacks:{ title: ctx => ctx[0] ? _fmtUtcStamp(ctx[0].parsed.x) : "" } },
+          zoom: zoomPlugin },
         scales:{
           x: subXAxis,
           y:{
@@ -2200,6 +2270,136 @@ function _liveMarkerRadius(spanMs) {
 // the one that actually contains it. Snapping the marker's x to its
 // containing candle's own timestamp keeps it visually pinned to a real
 // candle at every resolution; `candles` is sorted ascending by open time.
+// Build the open position's entry/TP/SL/backstop lines. Single source of truth
+// for both the full chart build and the lightweight 15s annotation refresh —
+// these were duplicated verbatim and had already drifted once.
+//
+// Only drawn if the picked range is actually "live" (its To-date is today) — a
+// historical range shouldn't show today's open position as if it belonged to
+// those older candles.
+function _liveBuildAnnotations(state, nowInRange) {
+  const a = {};
+  if (!nowInRange || !state || state.phase !== "in_position") return a;
+
+  // yAdjust nudges each label off its own line so it stays readable even when
+  // entry and TP land within a few dollars of each other (common right after
+  // entry, since TP = opposite band, and it drifts closer as the BB channel
+  // compresses over the life of the trade). The direction must follow which
+  // value is actually higher (long: TP above entry, short: entry above TP) —
+  // a fixed +8/-8 pair pushed the labels past each other whenever the true gap
+  // was smaller than 8px, so TP's label rendered below entry's even though
+  // TP's line was still above it.
+  const entryAboveTp = state.pos_entry != null && state.pos_tp != null && state.pos_entry > state.pos_tp;
+
+  // Entry and TP keep adjustScaleRange (default true): they sit next to price
+  // and are what you're watching. SL and backstop explicitly do NOT — see
+  // _liveFlagOffscaleLines for why, and for what replaces them when off-view.
+  if (state.pos_entry) a.entry = {
+    type: "line", scaleID: "y", value: state.pos_entry,
+    borderColor: "#6b8fae", borderWidth: 1, borderDash: [4, 4],
+    label: { content: `Entry $${state.pos_entry.toFixed(0)}`, display: true, color: "#6b8fae", backgroundColor: "transparent", font: { size: 10 }, position: "end", yAdjust: entryAboveTp ? -8 : 8 },
+  };
+  if (state.pos_tp) a.tp = {
+    type: "line", scaleID: "y", value: state.pos_tp,
+    borderColor: "#5fa876", borderWidth: 1.5, borderDash: [6, 3],
+    label: { content: `TP $${state.pos_tp.toFixed(0)}`, display: true, color: "#5fa876", backgroundColor: "transparent", font: { size: 10 }, position: "end", yAdjust: entryAboveTp ? 8 : -8 },
+  };
+  if (state.pos_sl) a.sl = {
+    type: "line", scaleID: "y", value: state.pos_sl, adjustScaleRange: false,
+    borderColor: "#d9736b", borderWidth: 1.5, borderDash: [6, 3],
+    label: { content: `SL $${state.pos_sl.toFixed(0)}`, display: true, color: "#d9736b", backgroundColor: "transparent", font: { size: 10 }, position: "end" },
+  };
+  if (state.pos_backstop) a.backstop = {
+    type: "line", scaleID: "y", value: state.pos_backstop, adjustScaleRange: false,
+    borderColor: "#c4703a", borderWidth: 1, borderDash: [3, 5],
+    label: { content: `Backstop $${state.pos_backstop.toFixed(0)}`, display: true, color: "#c4703a", backgroundColor: "transparent", font: { size: 10 }, position: "end" },
+  };
+  return a;
+}
+
+// SL and backstop are excluded from y-axis autoscaling, because for most of a
+// trade's life they sit ~$1,000 from price and dragging the axis out to reach
+// them squeezes the actual price action into a third of the chart height
+// (measured: candles occupying 69px of 212px on a 12h view). Letting the axis
+// track price instead roughly triples the space the candles get.
+//
+// The cost is that an excluded line clips out of view entirely. So anything
+// off-scale gets a compact flag pinned to the edge it disappeared past, with
+// an arrow for direction — you keep the value and which way it lies, and the
+// line itself slides back into view as price approaches it, which is exactly
+// when it starts mattering. Runs after layout, when y.min/y.max are real.
+function _liveFlagOffscaleLines(chart) {
+  const y = chart?.scales?.y;
+  const anns = chart?.options?.plugins?.annotation?.annotations;
+  if (!y || !anns) return;
+
+  let changed = false;
+  const below = [], above = [];
+  for (const key of ["sl", "backstop"]) {
+    const edgeKey = key + "_edge";
+    if (anns[edgeKey]) { delete anns[edgeKey]; changed = true; }   // always rebuilt
+    const line = anns[key];
+    if (!line || line.value == null) continue;
+    if      (line.value < y.min) below.push({ key, line });
+    else if (line.value > y.max) above.push({ key, line });
+  }
+
+  // Both can be off-scale at once (SL and backstop usually are, together), and
+  // pinning both to the same spot renders them on top of each other. Stack them
+  // instead, ordered so their on-screen order still matches their real prices:
+  // below the axis the lowest price sits lowest, above it the highest sits highest.
+  below.sort((a, b) => a.line.value - b.line.value);
+  above.sort((a, b) => b.line.value - a.line.value);
+
+  const place = (list, atMin) => list.forEach(({ key, line }, i) => {
+    anns[key + "_edge"] = {
+      type: "label", xScaleID: "x", yScaleID: "y",
+      xValue: chart.scales.x.max, yValue: atMin ? y.min : y.max,
+      content: `${line.label.content} ${atMin ? "↓" : "↑"}`,
+      color: line.borderColor, backgroundColor: "transparent",
+      font: { size: 10 }, position: { x: "end", y: "center" },
+      xAdjust: -4, yAdjust: (atMin ? -1 : 1) * (9 + i * 13),
+    };
+    changed = true;
+  });
+  place(below, true);
+  place(above, false);
+
+  if (changed) chart.update("none");
+}
+
+// Lift B/S markers clear of the candle wick by a fixed number of PIXELS.
+//
+// This was previously a fraction (1.2%) of the candle high/low span, computed
+// before the chart existed. That silently collapsed to nothing whenever a
+// position was open: the SL and Backstop annotation lines stretch the y-axis
+// well below the candles, so the axis can run ~3x taller than the candle range
+// and 1.2% of it lands at barely one pixel — for a 22px marker. The markers sat
+// on top of the wicks exactly when the chart was most worth reading.
+//
+// No percentage fixes that, because the offset needed depends on the axis
+// range, which isn't known until after layout. So it runs here instead, once
+// per build, against the y-scale's real pixel geometry. Nudging the markers
+// does feed back into y-axis autoscaling a little; a single pass is close
+// enough and avoids an update loop.
+function _liveOffsetMarkers(chart, gapPx) {
+  const y = chart?.scales?.y;
+  if (!y || !y.height) return;
+  const pricePerPx = (y.max - y.min) / y.height;
+  if (!isFinite(pricePerPx) || pricePerPx <= 0) return;
+  let touched = false;
+  chart.data.datasets.forEach(ds => {
+    if (ds.label !== "Buy" && ds.label !== "Sell" && ds.label !== "Open") return;
+    ds.data.forEach(p => {
+      if (p._baseY == null) return;
+      p.y = p._side === "buy" ? p._baseY - pricePerPx * gapPx
+                              : p._baseY + pricePerPx * gapPx;
+      touched = true;
+    });
+  });
+  if (touched) chart.update("none");
+}
+
 function _snapTsToCandleOpen(candles, ts) {
   if (!candles.length) return ts;
   if (ts < candles[0][0]) return candles[0][0];
@@ -2210,6 +2410,29 @@ function _snapTsToCandleOpen(candles, ts) {
   return candles[candles.length - 1][0];
 }
 
+// Rolling quick range, in hours. When set, every rebuild re-anchors the window
+// to "now" instead of reusing a frozen from/to — a "last 4 hours" view has to
+// slide, otherwise the 15s refresh would keep `from` pinned and the window
+// would just grow. null = the date pickers are in charge.
+let _liveQuickRangeH = null;
+
+function _liveSyncQuickRangeButtons() {
+  document.querySelectorAll(".live-quick-btn").forEach(btn => {
+    const on = _liveQuickRangeH != null && Number(btn.dataset.hours) === _liveQuickRangeH;
+    btn.classList.toggle("bg-indigo-600",   on);
+    btn.classList.toggle("border-indigo-600", on);
+    btn.classList.toggle("text-white",      on);
+  });
+}
+
+function liveApplyQuickRange(hours) {
+  _liveQuickRangeH = hours;
+  _liveSyncQuickRangeButtons();
+  const now = Date.now();
+  liveBuildChart(_liveLastState, _liveLastTrades,
+                 { fromMs: now - hours * 3_600_000, toMs: now });
+}
+
 function liveApplyDateRange() {
   const fromMs = _liveDateInputToMs(document.getElementById("live-chart-from"), false);
   const toMs   = _liveDateInputToMs(document.getElementById("live-chart-to"), true);
@@ -2217,13 +2440,14 @@ function liveApplyDateRange() {
     alert("Pick a valid From/To range (To must be after From).");
     return;
   }
+  _liveQuickRangeH = null;          // explicit date pick takes over from the quick range
+  _liveSyncQuickRangeButtons();
   liveBuildChart(_liveLastState, _liveLastTrades, { fromMs, toMs });
 }
 
 // Lightweight update — only replaces annotation values, no data reload
 function liveUpdateChartAnnotations(state) {
   if (!livePriceChart) return;
-  const annotations = {};
   // Only draw the live position's entry/TP/SL/backstop lines if the picked
   // range is actually "live" (its To-date is today) — showing today's
   // open-position lines across an unrelated historical range would be
@@ -2234,39 +2458,14 @@ function liveUpdateChartAnnotations(state) {
   // false by the time this runs.
   const nowInRange = _liveChartFromMs != null && _liveChartToMs != null
     && _liveRangeIsLive(_liveChartToMs);
-  if (nowInRange && state && state.phase === "in_position") {
-    // yAdjust nudges each label off its own line so it stays readable even
-    // when entry and TP land within a few dollars of each other (common
-    // right after entry, since TP = opposite band, and it drifts closer as
-    // the BB channel compresses over the life of the trade). The direction
-    // must follow which value is actually higher (long: TP above entry,
-    // short: entry above TP) — a fixed +8/-8 pair pushed the labels past
-    // each other whenever the true gap was smaller than 8px, so e.g. TP's
-    // label rendered below entry's even though TP's line was still above it.
-    const entryAboveTp = state.pos_entry != null && state.pos_tp != null && state.pos_entry > state.pos_tp;
-    if (state.pos_entry) annotations.entry = {
-      type: "line", scaleID: "y", value: state.pos_entry,
-      borderColor: "#6b8fae", borderWidth: 1, borderDash: [4, 4],
-      label: { content: `Entry $${state.pos_entry.toFixed(0)}`, display: true, color: "#6b8fae", backgroundColor: "transparent", font: { size: 10 }, position: "end", yAdjust: entryAboveTp ? -8 : 8 },
-    };
-    if (state.pos_tp) annotations.tp = {
-      type: "line", scaleID: "y", value: state.pos_tp,
-      borderColor: "#5fa876", borderWidth: 1.5, borderDash: [6, 3],
-      label: { content: `TP $${state.pos_tp.toFixed(0)}`, display: true, color: "#5fa876", backgroundColor: "transparent", font: { size: 10 }, position: "end", yAdjust: entryAboveTp ? 8 : -8 },
-    };
-    if (state.pos_sl) annotations.sl = {
-      type: "line", scaleID: "y", value: state.pos_sl,
-      borderColor: "#d9736b", borderWidth: 1.5, borderDash: [6, 3],
-      label: { content: `SL $${state.pos_sl.toFixed(0)}`, display: true, color: "#d9736b", backgroundColor: "transparent", font: { size: 10 }, position: "end" },
-    };
-    if (state.pos_backstop) annotations.backstop = {
-      type: "line", scaleID: "y", value: state.pos_backstop,
-      borderColor: "#c4703a", borderWidth: 1, borderDash: [3, 5],
-      label: { content: `Backstop $${state.pos_backstop.toFixed(0)}`, display: true, color: "#c4703a", backgroundColor: "transparent", font: { size: 10 }, position: "end" },
-    };
-  }
-  livePriceChart.options.plugins.annotation.annotations = annotations;
+  livePriceChart.options.plugins.annotation.annotations =
+    _liveBuildAnnotations(state, nowInRange);
   livePriceChart.update("none");
+  // Entry/TP still expand the y-axis, so changing them (a moving TP, an SL
+  // trail) shifts the pixel scale the marker gap was computed against. Cheap
+  // to redo, and idempotent — offsets are always recomputed from _baseY.
+  _liveOffsetMarkers(livePriceChart, _liveMarkerRadius(_liveChartToMs - _liveChartFromMs) + 6);
+  _liveFlagOffscaleLines(livePriceChart);
 }
 
 async function liveBuildChart(state, trades, opts) {
@@ -2281,7 +2480,12 @@ async function liveBuildChart(state, trades, opts) {
   //    from silently discarding a range the user picked
   //  - else nothing — first-ever load, let the server pick the default
   let fromMs = opts?.fromMs, toMs = opts?.toMs;
-  if (fromMs == null && _liveChartFromMs != null) {
+  if (fromMs == null && _liveQuickRangeH != null) {
+    // Rolling quick range — re-anchor BOTH ends to now, so the window slides
+    // with time instead of growing the way a fixed `from` would.
+    toMs   = Date.now();
+    fromMs = toMs - _liveQuickRangeH * 3_600_000;
+  } else if (fromMs == null && _liveChartFromMs != null) {
     fromMs = _liveChartFromMs;
     toMs   = _liveRangeIsLive(_liveChartToMs) ? Date.now() : _liveChartToMs;
   }
@@ -2302,9 +2506,12 @@ async function liveBuildChart(state, trades, opts) {
     return;
   }
 
-  const { candles = [], bb_upper = [], bb_mid = [], bb_lower = [], ema = [], timeframe, from_ms, to_ms } = chartData;
+  const { candles = [], bb_upper = [], bb_mid = [], bb_lower = [], ema = [],
+          indicator_ts = [], timeframe, indicator_timeframe, signal_timeframe,
+          from_ms, to_ms } = chartData;
   if (!candles.length) return;
 
+  _liveSignalMs = _tfToMs(signal_timeframe) || _liveSignalMs;
   _liveLastClosePrice = candles[candles.length - 1][4];
   const lastCloseEl = document.getElementById("live-header-lastclose");
   if (lastCloseEl) lastCloseEl.textContent = `$${fmt(_liveLastClosePrice)}`;
@@ -2317,17 +2524,41 @@ async function liveBuildChart(state, trades, opts) {
   document.getElementById("live-chart-from").value = _liveMsToDateInputValue(from_ms);
   document.getElementById("live-chart-to").value   = _liveMsToDateInputValue(to_ms);
 
-  // Update header label
+  // Update header label. It has to state the candle resolution AND what the
+  // indicators were computed on, because those are only the same thing at 15m.
+  // Bands computed at the display resolution are a chart overlay the bot never
+  // saw — labelling them plainly is what keeps this chart honest, and it's the
+  // difference between "the entry looks $700 off the band" being a bug report
+  // and being self-explanatory.
+  const dispTf = (timeframe || "15m").toUpperCase();
+  const indTf  = (indicator_timeframe || timeframe || "15m").toUpperCase();
+  const sigTf  = (signal_timeframe || "15m").toUpperCase();
   const hdr = document.getElementById("live-chart-hdr");
-  if (hdr) hdr.innerHTML =
-    `${symbol}/USDT · ${(timeframe || "15m").toUpperCase()} &nbsp;·&nbsp;<span class="text-indigo-400">BB(20, 3.0)</span> &nbsp;·&nbsp;<span class="text-yellow-400">EMA-150</span>`;
+  if (hdr) {
+    const inds = `<span class="text-indigo-400">BB(20, 3.0)</span> &nbsp;·&nbsp;<span class="text-yellow-400">EMA-150</span>`;
+    let tail;
+    if (indTf !== sigTf) {
+      tail = `${inds} &nbsp;·&nbsp;<span class="text-orange-400">at ${indTf} — display only, bot signals on ${sigTf}</span>`;
+    } else if (dispTf !== sigTf) {
+      tail = `${inds} &nbsp;·&nbsp;<span class="text-gray-500">on ${sigTf} — bot signal basis</span>`;
+    } else {
+      tail = inds;
+    }
+    hdr.innerHTML = `${symbol}/USDT · ${dispTf}${dispTf === indTf ? "" : " candles"} &nbsp;·&nbsp;${tail}`;
+  }
 
   // ── Build datasets ──────────────────────────────────────────
-  const ohlcData    = candles.map(c => ({ x: c[0], o: c[1], h: c[2], l: c[3], c: c[4] }));
-  const bbUpperData = candles.map((c, i) => bb_upper[i] != null ? { x: c[0], y: bb_upper[i] } : null).filter(Boolean);
-  const bbMidData   = candles.map((c, i) => bb_mid[i]   != null ? { x: c[0], y: bb_mid[i]   } : null).filter(Boolean);
-  const bbLowerData = candles.map((c, i) => bb_lower[i] != null ? { x: c[0], y: bb_lower[i] } : null).filter(Boolean);
-  const emaData     = candles.map((c, i) => ema[i]       != null ? { x: c[0], y: ema[i]       } : null).filter(Boolean);
+  const ohlcData = candles.map(c => ({ x: c[0], o: c[1], h: c[2], l: c[3], c: c[4] }));
+
+  // Indicators ship with their own timestamps, not zipped to `candles` by
+  // index — when the display drops to 1h the bands are still 15m, so there are
+  // 4 band points per candle. Falls back to candle timestamps if an older
+  // server build didn't send indicator_ts.
+  const indTs = indicator_ts.length ? indicator_ts : candles.map(c => c[0]);
+  const bbUpperData = indTs.map((t, i) => bb_upper[i] != null ? { x: t, y: bb_upper[i] } : null).filter(Boolean);
+  const bbMidData   = indTs.map((t, i) => bb_mid[i]   != null ? { x: t, y: bb_mid[i]   } : null).filter(Boolean);
+  const bbLowerData = indTs.map((t, i) => bb_lower[i] != null ? { x: t, y: bb_lower[i] } : null).filter(Boolean);
+  const emaData     = indTs.map((t, i) => ema[i]      != null ? { x: t, y: ema[i]      } : null).filter(Boolean);
 
   // ── B/S markers from closed trades ──────────────────────────
   // x is snapped to the containing candle's own open timestamp (see
@@ -2339,25 +2570,25 @@ async function liveBuildChart(state, trades, opts) {
   // than comparing x back to entry_ts, since snapping can make two
   // timestamps land on the same candle.
   //
-  // y is nudged off the candle's own high/low (not the trade's exact fill
-  // price) so the marker never overlaps the wick: "B" sits just below the
-  // candle's low, "S" just above its high. Offset is a fixed fraction of
-  // the visible price range, not per-candle, so spacing looks consistent
-  // across calm and volatile candles alike.
+  // y starts at the candle's own wick tip ("B" at the low, "S" at the high).
+  // The visual gap that lifts it clear of the wick is applied after the chart
+  // is built, in pixels — see _liveOffsetMarkers for why it can't be done here.
   const candleByTs = new Map(candles.map(c => [c[0], c]));
-  const visibleHigh = Math.max(...candles.map(c => c[2]));
-  const visibleLow  = Math.min(...candles.map(c => c[3]));
-  const markerYOffset = (visibleHigh - visibleLow) * 0.012;
-  function _markerY(candleTs, side, fallbackPrice) {
-    const c = candleByTs.get(candleTs);
-    if (!c) return fallbackPrice; // shouldn't happen — snap always picks a real candle ts
-    return side === "buy" ? c[3] - markerYOffset : c[2] + markerYOffset;
+  function _mkPoint(x, side, fallbackPrice, t, isEntry) {
+    const c    = candleByTs.get(x);
+    // fallback shouldn't happen — snap always picks a real candle ts
+    const base = c ? (side === "buy" ? c[3] : c[2]) : fallbackPrice;
+    return { x, y: base, _baseY: base, _side: side, _t: t, _isEntry: isEntry };
   }
 
   const sz = _liveMarkerRadius(to_ms - from_ms) * 2;
   const buyImg  = makeLetterMarker("B", "#5fa876", sz);
   const sellImg = makeLetterMarker("S", "#d9736b", sz);
-  const openImg = makeLetterMarker("B", "#8a8577", sz);
+  // The open position's marker follows its direction: a short is entered by
+  // selling, so it gets an "S" above the candle, not a "B" below it. This was
+  // hardcoded to "B"/below, which mislabelled and misplaced every open short.
+  const openIsShort = state?.pos_direction === "short";
+  const openImg = makeLetterMarker(openIsShort ? "S" : "B", "#8a8577", sz);
 
   const buyPoints  = [];
   const sellPoints = [];
@@ -2369,60 +2600,25 @@ async function liveBuildChart(state, trades, opts) {
     const dir     = t.direction;
     if (!entryTs) return;
     const entryX = _snapTsToCandleOpen(candles, entryTs);
-    if (dir === "long")  buyPoints.push({ x: entryX, y: _markerY(entryX, "buy", t.entry), _t: t, _isEntry: true });
-    else                 sellPoints.push({ x: entryX, y: _markerY(entryX, "sell", t.entry), _t: t, _isEntry: true });
+    if (dir === "long")  buyPoints.push(_mkPoint(entryX, "buy",  t.entry, t, true));
+    else                 sellPoints.push(_mkPoint(entryX, "sell", t.entry, t, true));
     if (exitTs && t.exit) {
       const exitX = _snapTsToCandleOpen(candles, exitTs);
-      if (dir === "long") sellPoints.push({ x: exitX, y: _markerY(exitX, "sell", t.exit), _t: t, _isEntry: false });
-      else                buyPoints.push({ x: exitX, y: _markerY(exitX, "buy", t.exit), _t: t, _isEntry: false });
+      if (dir === "long") sellPoints.push(_mkPoint(exitX, "sell", t.exit, t, false));
+      else                buyPoints.push(_mkPoint(exitX, "buy",  t.exit, t, false));
     }
   });
 
   // Grey "B" for the open position entry (not yet closed)
   if (state && state.phase === "in_position" && state.pos_entry_ts) {
     const openX = _snapTsToCandleOpen(candles, state.pos_entry_ts);
-    openPoints.push({ x: openX, y: _markerY(openX, "buy", state.pos_entry), _t: state, _isEntry: true });
+    openPoints.push(_mkPoint(openX, openIsShort ? "sell" : "buy", state.pos_entry, state, true));
   }
 
   // ── Annotation lines ─────────────────────────────────────────
-  // Only draw the live position's lines if the picked range is actually
-  // "live" (its To-date is today) — a historical range shouldn't show
-  // today's open position as if it were relevant to those older candles.
   // Uses _liveRangeIsLive() (calendar-day check), not an exact millisecond
   // comparison against to_ms — see liveUpdateChartAnnotations for why.
-  const nowInRange = _liveRangeIsLive(to_ms);
-  const annotations = {};
-  if (nowInRange && state && state.phase === "in_position") {
-    // yAdjust nudges each label off its own line so it stays readable even
-    // when entry and TP land within a few dollars of each other (common
-    // right after entry, since TP = opposite band, and it drifts closer as
-    // the BB channel compresses over the life of the trade). The direction
-    // must follow which value is actually higher (long: TP above entry,
-    // short: entry above TP) — a fixed +8/-8 pair pushed the labels past
-    // each other whenever the true gap was smaller than 8px, so e.g. TP's
-    // label rendered below entry's even though TP's line was still above it.
-    const entryAboveTp = state.pos_entry != null && state.pos_tp != null && state.pos_entry > state.pos_tp;
-    if (state.pos_entry) annotations.entry = {
-      type: "line", scaleID: "y", value: state.pos_entry,
-      borderColor: "#6b8fae", borderWidth: 1, borderDash: [4, 4],
-      label: { content: `Entry $${state.pos_entry.toFixed(0)}`, display: true, color: "#6b8fae", backgroundColor: "transparent", font: { size: 10 }, position: "end", yAdjust: entryAboveTp ? -8 : 8 },
-    };
-    if (state.pos_tp) annotations.tp = {
-      type: "line", scaleID: "y", value: state.pos_tp,
-      borderColor: "#5fa876", borderWidth: 1.5, borderDash: [6, 3],
-      label: { content: `TP $${state.pos_tp.toFixed(0)}`, display: true, color: "#5fa876", backgroundColor: "transparent", font: { size: 10 }, position: "end", yAdjust: entryAboveTp ? 8 : -8 },
-    };
-    if (state.pos_sl) annotations.sl = {
-      type: "line", scaleID: "y", value: state.pos_sl,
-      borderColor: "#d9736b", borderWidth: 1.5, borderDash: [6, 3],
-      label: { content: `SL $${state.pos_sl.toFixed(0)}`, display: true, color: "#d9736b", backgroundColor: "transparent", font: { size: 10 }, position: "end" },
-    };
-    if (state.pos_backstop) annotations.backstop = {
-      type: "line", scaleID: "y", value: state.pos_backstop,
-      borderColor: "#c4703a", borderWidth: 1, borderDash: [3, 5],
-      label: { content: `Backstop $${state.pos_backstop.toFixed(0)}`, display: true, color: "#c4703a", backgroundColor: "transparent", font: { size: 10 }, position: "end" },
-    };
-  }
+  const annotations = _liveBuildAnnotations(state, _liveRangeIsLive(to_ms));
 
   // ── x window: exactly the resolved from/to, no zoom/pan involved ──
   const xMax  = to_ms;
@@ -2463,7 +2659,11 @@ async function liveBuildChart(state, trades, opts) {
           displayColors: false,
           padding: 10,
           callbacks: {
-            title: ctx => (ctx[0]?.dataset.label === "Buy" || ctx[0]?.dataset.label === "Sell" || ctx[0]?.dataset.label === "Open") ? "" : undefined,
+            title: ctx => {
+              const l = ctx[0]?.dataset.label;
+              if (l === "Buy" || l === "Sell" || l === "Open") return "";  // markers print their own date
+              return ctx[0] ? _fmtUtcStamp(ctx[0].parsed.x) : "";
+            },
             label: ctx => {
               const l = ctx.dataset.label;
               if (l === "Price") { const r = ctx.raw; return `O:${r.o.toFixed(1)} H:${r.h.toFixed(1)} L:${r.l.toFixed(1)} C:${r.c.toFixed(1)}`; }
@@ -2497,6 +2697,22 @@ async function liveBuildChart(state, trades, opts) {
                 const entryTs = t.entry_ts ?? t.pos_entry_ts;
                 const entryPx = t.entry ?? t.pos_entry;
                 const lines = [`Date: ${fmtDate(entryTs)}`, `Open ${dir}: 10X`, `Entry: ${fmtN(entryPx)}`];
+                // Name the band the bot actually traded against. It is the one
+                // from the LAST CLOSED signal candle, not the candle the marker
+                // sits on — and a marker's containing candle opens exactly when
+                // the previous one closed, so flooring the entry time to the
+                // signal interval gives that close time directly.
+                //
+                // Without this the chart reads as an error: on 2026-08-09 22:39
+                // the bot entered on a band of 64970.02, but by the time the
+                // marker's own candle closed the drawn band had moved to
+                // 64936.01, leaving the marker $34 "off" a line it never used.
+                // That gap appears on any entry where price moves fast — which
+                // is precisely when entries fire.
+                if (_liveSignalMs > 0 && entryTs) {
+                  const bandTs = Math.floor(entryTs / _liveSignalMs) * _liveSignalMs;
+                  lines.push(`= ${dir === "Long" ? "lower" : "upper"} band as of ${_fmtUtcHm(bandTs)} close`);
+                }
                 if (l === "Open") lines.push("Status: Open (unresolved)");
                 return lines;
               } else {
@@ -2523,14 +2739,19 @@ async function liveBuildChart(state, trades, opts) {
           type: "time",
           min: xMin,
           max: xMax,
-          time: { tooltipFormat: "yyyy-MM-dd HH:mm 'UTC'", unit: xUnit },
+          // No tooltipFormat: the adapter would render it in local time. The
+          // tooltip title callback below formats in real UTC instead.
+          time: { unit: xUnit },
           ticks: {
             color: "#8a8577",
             maxTicksLimit: 8,
             // Use shared _fmtUtcTick so labels are always UTC
             callback(val) { return _fmtUtcTick(val, this.options?.time?.unit); },
           },
-          grid: { color: "#efece4" },
+          // Vertical gridlines off: they add a lattice over the candles for
+          // information the time axis already carries. Horizontal ones stay —
+          // reading a price level off the chart depends on them.
+          grid: { display: false },
         },
         y: {
           ticks: { color: "#8a8577", callback: v => `$${v >= 1000 ? (v/1000).toFixed(1)+"k" : v.toFixed(0)}` },
@@ -2540,6 +2761,12 @@ async function liveBuildChart(state, trades, opts) {
     },
   });
 
+  // Marker gap = its own radius (y is the image's centre) plus breathing room.
+  // Order matters: offsetting markers can nudge the y-axis, so the off-scale
+  // check has to read the axis after that has settled.
+  _liveOffsetMarkers(livePriceChart, sz / 2 + 6);
+  _liveFlagOffscaleLines(livePriceChart);
+  _liveSyncQuickRangeButtons();
 }
 
 async function liveRefresh() {
@@ -2614,6 +2841,14 @@ function liveRender(data) {
   pnlEl.textContent  = stats.total_trades ? fmtD(stats.total_pnl) : "—";
   pnlEl.className    = `text-xl font-bold ${stats.total_pnl >= 0 ? "text-green-400" : "text-red-400"}`;
   document.getElementById("live-stat-capital").textContent = stats.current_capital ? `$${fmt(stats.current_capital)}` : "—";
+  const feesEl = document.getElementById("live-stat-fees");
+  if (feesEl) {
+    feesEl.textContent = stats.total_trades ? `−$${fmt(stats.total_costs, 2)}` : "—";
+    const splitEl = document.getElementById("live-stat-fees-split");
+    if (splitEl) splitEl.textContent = stats.total_trades
+      ? `$${fmt(stats.total_exchange_fees, 2)} exchange · $${fmt(stats.total_funding, 2)} funding`
+      : "";
+  }
   document.getElementById("live-stat-avgwin").textContent  = stats.wins   ? `+$${fmt(stats.avg_win)}`  : "—";
   document.getElementById("live-stat-avgloss").textContent = stats.losses ? `-$${fmt(Math.abs(stats.avg_loss))}` : "—";
   document.getElementById("live-stat-maxdd").textContent   = stats.max_drawdown ? `-$${fmt(stats.max_drawdown)}` : "—";
@@ -2653,10 +2888,13 @@ function liveRender(data) {
   const closed = trades.filter(t => t.reason !== "open").reverse(); // newest first
   _liveTradesForModal = closed; // rows reference this by index for the detail modal
   if (!closed.length) {
-    tbody.innerHTML = `<tr><td colspan="10" class="px-3 py-6 text-center text-gray-600">No closed trades yet</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="px-3 py-6 text-center text-gray-600">No closed trades yet</td></tr>`;
   } else {
     tbody.innerHTML = closed.map((t, i) => {
-      const pnlPos  = (t.pnl_usdt ?? 0) >= 0;
+      // Net of fees AND funding — funding is a cost of the trade like any
+      // other, so it decides whether the row reads as a win.
+      const netPnl  = t.pnl_after_funding_usdt ?? t.pnl_usdt ?? null;
+      const pnlPos  = (netPnl ?? 0) >= 0;
       const pnlCls  = pnlPos ? "text-green-400" : "text-red-400";
       const dirCls  = t.direction === "long" ? "text-green-400" : "text-red-400";
       const reasonCls = t.reason === "TP" ? "text-green-400" : "text-red-400";
@@ -2679,7 +2917,16 @@ function liveRender(data) {
         <td class="px-3 py-2 text-center font-semibold ${reasonCls}">${t.reason || "—"}</td>
         <td class="px-3 py-2 text-right ${pnlCls}">${t.pnl_pct != null ? (t.pnl_pct >= 0 ? "+" : "")+fmt(t.pnl_pct,2)+"%" : "—"}</td>
         <td class="px-3 py-2 text-right text-amber-500">${t.fee_usdt != null ? "−$"+fmt(t.fee_usdt) : "—"}</td>
-        <td class="px-3 py-2 text-right font-semibold ${pnlCls}">${t.pnl_usdt != null ? (pnlPos?"+":"")+`$${fmt(t.pnl_usdt)}` : "—"}</td>
+        <td class="px-3 py-2 text-right ${t.funding_usdt > 0 ? "text-amber-500" : t.funding_usdt < 0 ? "text-emerald-400" : "text-gray-500"}"
+            title="${t.funding_windows != null ? t.funding_windows + " funding settlement(s) held through" : ""}">${
+          t.funding_usdt == null ? "—"
+            : t.funding_usdt === 0 ? "$0.00"
+            : (t.funding_usdt > 0 ? "−$" : "+$") + fmt(Math.abs(t.funding_usdt))}</td>
+        <!-- P&L $ is net of BOTH fees and funding — the trade's real result.
+             Rendered "−$1.66" to match the Fees/Funding columns; it previously
+             showed "$-1.66", which sat oddly beside them in the same row. -->
+        <td class="px-3 py-2 text-right font-semibold ${netPnl >= 0 ? "text-emerald-400" : "text-red-400"}">${
+          netPnl != null ? (netPnl >= 0 ? "+$" : "−$") + fmt(Math.abs(netPnl)) : "—"}</td>
         <td class="px-3 py-2 text-right text-gray-300">${t.capital != null ? "$"+fmt(t.capital) : "—"}</td>
         <td class="px-3 py-2 text-gray-400">${fmtTs(exitTs)}</td>
       </tr>`;
@@ -2724,12 +2971,16 @@ function liveRender(data) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: {
-        callbacks: { label: ctx => `$${ctx.parsed.y.toFixed(2)}` }
+        callbacks: {
+          title: ctx => ctx[0] ? _fmtUtcStamp(ctx[0].parsed.x) : "",
+          label: ctx => `$${ctx.parsed.y.toFixed(2)}`,
+        }
       }},
       scales: {
         x: {
           type: "time",
-          time: { tooltipFormat: "yyyy-MM-dd HH:mm", displayFormats: { hour: "MM-dd HH:mm", day: "MM-dd", month: "yyyy-MM" } },
+          // tooltipFormat dropped — see _fmtUtcStamp; the title callback owns it.
+          time: { displayFormats: { hour: "MM-dd HH:mm", day: "MM-dd", month: "yyyy-MM" } },
           ticks: { color: "#8a8577", maxTicksLimit: 6,
             callback: (val, i, ticks) => {
               const d = new Date(val);
@@ -2760,7 +3011,7 @@ function openLiveTradeModal(i) {
 
   const backdrop = document.getElementById("modal-backdrop");
   const content  = document.getElementById("modal-content");
-  const pnlPos   = (trade.pnl_usdt ?? 0) >= 0;
+  const pnlPos   = (trade.pnl_after_funding_usdt ?? trade.pnl_usdt ?? 0) >= 0;
   const pnlCls   = pnlPos ? "text-emerald-400" : "text-red-400";
 
   // Margin (capital actually committed to this trade) backs out from the
@@ -2810,9 +3061,15 @@ function openLiveTradeModal(i) {
         <span class="text-gray-400">Fees <span class="text-gray-500">(entry + exit, ${LIVE_LEVERAGE}x)</span></span>
         <span class="text-amber-500">−$${trade.fee_usdt.toFixed(2)}</span>
       </div>
+      ${trade.funding_usdt != null ? `
+      <div class="flex justify-between py-0.5">
+        <span class="text-gray-400">Funding <span class="text-gray-500">(${trade.funding_windows} settlement${trade.funding_windows === 1 ? "" : "s"} held through${trade.funding_charged ? "" : ", reconstructed"})</span></span>
+        <span class="${trade.funding_usdt > 0 ? 'text-amber-500' : trade.funding_usdt < 0 ? 'text-emerald-400' : 'text-gray-500'}">${
+          trade.funding_usdt === 0 ? "$0.00" : (trade.funding_usdt > 0 ? "−$" : "+$") + Math.abs(trade.funding_usdt).toFixed(4)}</span>
+      </div>` : ""}
       <div class="flex justify-between py-1 mt-1 border-t border-gray-700 font-bold">
         <span class="text-gray-300">Total P&amp;L</span>
-        <span class="${pnlCls}">${pnlPos ? "+" : ""}$${trade.pnl_usdt.toFixed(2)}</span>
+        <span class="${pnlCls}">${pnlPos ? "+" : "−"}$${Math.abs(trade.pnl_after_funding_usdt ?? trade.pnl_usdt).toFixed(2)}</span>
       </div>
     </div>` : ""}
     <div style="height:220px"><canvas id="modal-chart"></canvas></div>
