@@ -1,8 +1,11 @@
 """
-bb_executor.py
---------------
+mexc_futures.py
+---------------
 MEXC interface layer for the BB Channel Rider live bot.
-Completely separate from executor.py (signal bot) — no shared state or imports.
+
+Self-contained by design: it holds no shared state and imports nothing from the
+strategy layer, so the exchange plumbing can be swapped or mocked without
+touching trading logic.
 
 Responsibilities:
   - Market entry orders
