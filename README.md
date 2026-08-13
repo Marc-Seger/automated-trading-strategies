@@ -32,7 +32,7 @@ Backtest over a full year of real 15-minute data (2025-08 → 2026-08), 25% sizi
 
 - **311 trades, 60.5% win rate, +$730.45 on a $1,000 start (+73%), 20.1% max drawdown**
 - **Out-of-sample** (only data after the 2026-05-10 freeze, which the parameters never saw): **66 trades, 65.2% win rate, +$359.73, 10.1% max drawdown**
-- **Live paper bot**, running since 2026-08-04: 8 closed trades, +$102.23. Far too few to mean anything yet.
+- **Live paper bot**, running since 2026-08-04 on a $1,000 paper balance and currently in profit. Deliberately not quoted precisely here: it closes trades every few days, so any figure written into a README is stale within the week. The dashboard has the live numbers. The count is still far too small to mean anything either way — that is the point of leaving it running.
 
 **Fees dominate.** The same year with fees switched off returns +$3,078, so roughly three quarters of the gross edge goes to the exchange. At 10x a round trip costs ~1.2% of margin, which means a take-profit on a small move can still close at a net loss.
 

@@ -528,12 +528,13 @@
     <h3 class="text-base font-semibold text-gray-100 mb-2">Stop Loss &amp; SL Snap</h3>
     <div class="space-y-2 mb-5">
       <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">SL %</span><span>Fixed percentage from entry. Set via the SL % slider in the sidebar.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">SL Snap threshold</span><span>Once price moves <em>threshold %</em> of the mid→band distance toward TP, the SL is moved to the mid-band. One-time and monotone (never lowers a long SL, never raises a short SL).</span></div>
+      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">SL Snap threshold</span><span>Once price moves <em>threshold %</em> of the mid→band distance toward TP, the SL jumps to the mid-band. It then <strong>keeps trailing the mid-band on every later candle</strong> for the life of the trade — the trigger fires once, the trailing does not stop. Monotone throughout (never lowers a long SL, never raises a short SL).</span></div>
       <div class="bg-gray-900 rounded p-3 font-mono text-xs text-gray-300">
-        <p class="text-gray-500 mb-1">Example — Long at $79,000, mid=$82,000, upper=$85,000, threshold=75%:</p>
-        <p>snap_trigger = $82,000 + 0.75 × ($85,000 − $82,000) = <span class="text-yellow-300">$84,250</span></p>
-        <p>When high ≥ $84,250 → SL moves from $75,050 up to <span class="text-yellow-300">$82,000</span> (fixed)</p>
+        <p class="text-gray-500 mb-1">Example — Long at $79,000, mid=$82,000, upper=$85,000, threshold=95% (the frozen value):</p>
+        <p>snap_trigger = $82,000 + 0.95 × ($85,000 − $82,000) = <span class="text-yellow-300">$84,850</span></p>
+        <p>When high ≥ $84,850 → SL jumps from $78,210 up to <span class="text-yellow-300">$82,000</span>, then trails the mid-band from there</p>
       </div>
+      <p class="text-gray-500 text-xs mt-2">Worth noticing: at 95% the trigger ($84,850) sits only $150 below the take-profit ($85,000, the upper band). In any fast move the snap fires seconds before the exit and does nothing. Its real value is the stalled case — price loiters near the band, the bands recompute, the mid rises, and the SL trails up behind it.</p>
     </div>
 
     <h3 class="text-base font-semibold text-gray-100 mb-2">Cooldown after SL</h3>
@@ -546,7 +547,7 @@
 
     <h3 class="text-base font-semibold text-gray-100 mb-2">Trend Filter (optional)</h3>
     <div class="space-y-2 mb-5">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Trend EMA</span><span>Configurable EMA period (default 200). Long entries only when close &gt; EMA (uptrend context). Short entries only when close &lt; EMA (downtrend context).</span></div>
+      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Trend EMA</span><span>Configurable EMA period. <strong>Default 150</strong>, matching the frozen live spec. Long entries only when close &gt; EMA (uptrend context). Short entries only when close &lt; EMA (downtrend context).</span></div>
       <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">On chart</span><span>Yellow EMA line overlaid on the price chart when trend filter is enabled.</span></div>
     </div>
 
@@ -639,15 +640,18 @@
 
     <!-- 3. Grid Search -->
     <h3 class="text-base font-semibold text-gray-100 mb-2">3 · Parameter Grid Search</h3>
-    <p class="text-gray-400 text-xs mb-4">16,200 combinations across 6 dimensions: std_dev (2.0–4.0 step 0.25), sl_pct (0.5–2%), sl_thresh (55–95%), cooldown (1–4), EMA period (100–300), direction.</p>
+    <p class="text-gray-400 text-xs mb-4">16,200 combinations across 6 dimensions: std_dev (2.0–4.0 step 0.25), sl_pct (0.5–2%), sl_thresh (55–95%), cooldown (1–4), EMA period (100–300), direction. Window 2025-06-01 → 2026-05-09; the spec was frozen the following day.</p>
+    <div class="bg-yellow-950 border border-yellow-800 rounded p-3 text-xs text-yellow-200 mb-4">
+      <span class="font-semibold">Read the rank correctly.</span> The pre-search config (thresh 85%, EMA-200) ranked #242. Two parameters were then changed to the values ranking #14, and the spec was frozen the next day &mdash; so <span class="font-semibold">#14 is the result of choosing on this window, not independent evidence about it</span>. The genuine robustness signal here is that 67.5% of all combinations were profitable, meaning the strategy family is not balanced on a knife edge. The actual validation is the out-of-sample period after the freeze, which the parameters never saw: 66 trades, 65.2% win rate, +$359.73, 10.1% max DD.
+    </div>
     <div class="flex gap-3 mb-5">
       <div class="flex-1 bg-gray-900 rounded p-3 text-center border border-gray-800">
         <p class="text-2xl font-bold text-emerald-400">67.5%</p>
         <p class="text-xs text-gray-400 mt-1">of 16,200 combos profitable</p>
       </div>
       <div class="flex-1 bg-gray-900 rounded p-3 text-center border border-gray-800">
-        <p class="text-2xl font-bold text-indigo-400">#242</p>
-        <p class="text-xs text-gray-400 mt-1">current params rank (top 1.5%)</p>
+        <p class="text-2xl font-bold text-indigo-400">#14</p>
+        <p class="text-xs text-gray-400 mt-1">frozen params rank &mdash; a <span class="text-yellow-300">selection</span>, not a validation</p>
       </div>
       <div class="flex-1 bg-gray-900 rounded p-3 text-center border border-gray-800">
         <p class="text-2xl font-bold text-gray-100">103/s</p>
@@ -907,11 +911,21 @@
       <p>price_move  = (exit − entry) / entry          <span class="text-gray-500">← long</span></p>
       <p>price_move  = (entry − exit) / entry          <span class="text-gray-500">← short</span></p>
       <p>gross_pnl % = price_move × leverage × 100</p>
-      <p>fee %       = 2 × fee_rate × leverage × 100   <span class="text-gray-500">← entry + exit</span></p>
+      <p>fee %       = (fee_entry + fee_exit) × leverage × 100</p>
       <p>net_pnl %   = gross_pnl % − fee %</p>
       <p>pnl_dollar  = (net_pnl % / 100) × trade_size</p>
     </div>
     <p class="text-gray-500 text-xs mt-3">Fees apply only to resolved trades (TP or SL). Open trades show gross P&amp;L with no fee deduction.</p>
+    <div class="bg-gray-900 rounded p-3 text-xs text-gray-400 mt-3 border border-gray-800">
+      <span class="text-gray-200 font-semibold">Fees are charged per leg, matching what the bot actually pays.</span>
+      Entry is a market order (<span class="font-mono text-gray-300">taker 0.06%</span>), the TP close is a market order
+      (<span class="font-mono text-gray-300">taker 0.06%</span>), and the stop-limit SL fills as a maker
+      (<span class="font-mono text-gray-300">0.04%</span>). The rare stop-market backstop is also taker but is not modelled,
+      so SL exits are costed slightly optimistically. Selecting a fee mode in the backtest controls overrides both legs with
+      a single rate for what-if comparisons.
+      <span class="block mt-2 text-yellow-300">This matters more than it looks: at 10× a round trip costs ~1.2% of margin, so a
+      take-profit on a small move can close at a net loss. Fees consume roughly three quarters of this strategy's gross edge.</span>
+    </div>
   </section>
 
   <!-- ── DATA & CACHE ──────────────────────────────────────── -->
