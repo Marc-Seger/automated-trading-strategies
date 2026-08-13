@@ -34,3 +34,11 @@ secrets.json
 credentials.json
 *.pem
 *.key
+
+# AI working notes — local only. May contain personal context
+# (job-search framing, salary thinking, candid self-assessment) and
+# operational detail like VPS access. Never belongs in a public repo.
+CLAUDE.md
+CLAUDE_CODE.md
+**/CLAUDE.md
+**/CLAUDE_CODE.md
