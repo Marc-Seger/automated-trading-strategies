@@ -24,3 +24,13 @@ data/ohlcv/
 # Bot runtime state — regenerated on each run
 data/state/
 data/trades/
+
+# Secret-bearing variants — .env alone does not cover these
+.env.*
+!.env.example
+*.local.yaml
+*.local.json
+secrets.json
+credentials.json
+*.pem
+*.key
