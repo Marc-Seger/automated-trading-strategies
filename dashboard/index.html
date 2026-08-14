@@ -559,8 +559,19 @@
 
   <!-- ── BBC: GATE 2 RESEARCH ────────────────────────────── -->
   <section id="doc-bbc-research" class="doc-section hidden">
-    <h2 class="text-xl font-bold text-gray-100 mb-1">BB Channel Rider — Gate 2 Analysis</h2>
-    <p class="text-gray-400 mb-5 text-sm">Full research conducted before building the live bot: funding fees, sizing sweep, and a 16,200-combination parameter grid search. Completed 2026-05-10.</p>
+    <h2 class="text-xl font-bold text-gray-100 mb-1">BB Channel Rider — Validation</h2>
+    <p class="text-gray-400 mb-4 text-sm">A strategy has to clear two separate hurdles before it is trusted to run. They answer different questions.</p>
+    <div class="grid md:grid-cols-2 gap-3 mb-5 text-xs">
+      <div class="bg-gray-900 border border-gray-700 rounded p-3">
+        <p class="font-semibold text-emerald-400 mb-1">Gate 1 — is it correct?</p>
+        <p class="text-gray-400">Run the strategy exactly as deployed over real data and check the results are what we think they are. The audit script imports the live strategy module directly, so it cannot measure anything other than what actually runs. Result in the spec card below.</p>
+      </div>
+      <div class="bg-gray-900 border border-gray-700 rounded p-3">
+        <p class="font-semibold text-indigo-400 mb-1">Gate 2 — is it fragile?</p>
+        <p class="text-gray-400">Vary everything and see whether the result survives. Funding costs, position sizing, and 16,200 parameter combinations. If it only works at exact magic numbers, it is a fluke rather than an effect. Sections 1–3 below.</p>
+      </div>
+    </div>
+    <p class="text-gray-500 mb-5 text-xs">Gate 2 research completed 2026-05-10, before the live bot was built. Gate 1 re-run 2026-08-12.</p>
 
     <!-- Validated spec card -->
     <div class="bg-gray-900 border border-gray-700 rounded p-4 mb-6">
@@ -595,7 +606,7 @@
 
     <!-- 2. Sizing Sweep -->
     <h3 class="text-base font-semibold text-gray-100 mb-2">2 · Sizing Sweep</h3>
-    <p class="text-gray-400 text-xs mb-3">Compounding amplifies both gains and drawdowns. The Calmar ratio (P&amp;L ÷ Max DD) measures return per unit of risk.</p>
+    <p class="text-gray-400 text-xs mb-3">Compounding amplifies both gains and drawdowns. The Calmar ratio (P&amp;L ÷ Max DD) measures return per unit of worst-case pain — <span class="text-gray-200">higher is better</span>. Doubling your position size roughly doubles profit, but it also roughly doubles the deepest hole you sit in on the way; Calmar tells you whether that trade was worth making. Note the frozen 25% is <em>not</em> the Calmar-optimal row: 50% scores slightly better but nearly doubles the drawdown, and a 37% drawdown is far harder to hold through than a 20% one.</p>
     <div class="overflow-x-auto mb-3">
       <table class="w-full text-xs border-collapse">
         <thead>

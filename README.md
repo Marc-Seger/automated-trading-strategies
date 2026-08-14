@@ -28,20 +28,32 @@ This is not a signal-following bot. Every entry and exit here comes from indicat
 
 Frozen spec (2026-05-10), BTC/USDT perpetual futures on MEXC, 15-minute candles, 10x leverage, 25% position sizing, entry on a band touch confirmed by the EMA-150 trend, full spec in [`STRATEGY_SPEC.md`](STRATEGY_SPEC.md).
 
-Backtest over a full year of real 15-minute data (2025-08 → 2026-08), 25% sizing, compounding, charging the fees the bot actually pays:
+### The number that actually counts
 
-- **311 trades, 60.5% win rate, +$730.45 on a $1,000 start (+73%), 20.1% max drawdown**
-- **Out-of-sample** (only data after the 2026-05-10 freeze, which the parameters never saw): **66 trades, 65.2% win rate, +$359.73, 10.1% max drawdown**
-- **Live paper bot**, running since 2026-08-04 on a $1,000 paper balance and currently in profit. Deliberately not quoted precisely here: it closes trades every few days, so any figure written into a README is stale within the week. The dashboard has the live numbers. The count is still far too small to mean anything either way — that is the point of leaving it running.
+Performance on data the parameters never saw. The grid search that chose them ran to 2026-05-09 and the spec was frozen the next day, so everything after is a genuine out-of-sample test:
+
+> **66 trades · 65.2% win rate · +$359.73 · 10.1% max drawdown** — 2026-05-10 → 2026-08-09
+
+That's the honest evidence, and it's a small sample. Three months is encouraging, not proof.
+
+### The full-year backtest
+
+2025-08 → 2026-08, 25% sizing, compounding, charging the fees the bot actually pays:
+
+> **311 trades · 60.5% win rate · +$730.45 on a $1,000 start (+73%) · 20.1% max drawdown**
+
+**Read this one as the optimistic figure.** Its window overlaps the parameter search by roughly nine months, so part of that performance is the parameters being flattered by the very data they were selected on. Choosing settings from history is normal and necessary; reporting their score on that same history is what inflates. The out-of-sample number above is the one that isn't affected.
 
 **Fees dominate.** The same year with fees switched off returns +$3,078, so roughly three quarters of the gross edge goes to the exchange. At 10x a round trip costs ~1.2% of margin, which means a take-profit on a small move can still close at a net loss.
 
 **What these numbers still don't capture.** Paper mode uses real prices and charges real fees, but assumes zero slippage and instant fills, so live trading would run somewhat below this. The backtest also can't tell a stop-limit fill from the market backstop, so stop-loss exits are costed at the cheaper maker rate. Both push the figures optimistic.
 
+### Live
+
+Running since 2026-08-04 on a $1,000 paper balance and currently in profit. Deliberately not quoted precisely here: it closes trades every few days, so any figure written into a README is stale within the week. The dashboard has the live numbers. The count is still far too small to mean anything either way — that is the point of leaving it running.
+
 - **Gate 1** (`research/gate1_audit.py`): calls `strategies/bb_channel.simulate` with no parameter overrides, so it can only ever measure the frozen constants the live bot imports from that same module.
 - **Gate 2** (`research/gate2_grid_search.py`): a 16,200-combination grid search, 67.5% of combinations profitable — the strategy family isn't balanced on a knife edge. Note the frozen set ranks 14th of 16,200 *on the window it was selected from*, so that ranking is a selection, not independent evidence. The out-of-sample figure above is the honest test.
-
-> **Superseded numbers.** This section previously read *290 trades, 63.8% win rate, +$10,348*. That came from a standalone audit script that had drifted from the deployed strategy on five counts, each one flattering: SL snap 85% vs 95%, EMA-200 vs EMA-150, 100% of capital per trade vs 25%, maker fees on both legs when entry and take-profit are market orders, and a win counted as a take-profit exit rather than a net gain. It measured a configuration that was never deployed. Corrected 2026-08-12; the old script is deleted and Gate 1 now imports the live strategy module directly.
 
 The other four strategies share the same backtest engine and dashboard but haven't been through this level of validation, they're there to build and test, not to trust blindly.
 
@@ -77,6 +89,14 @@ To run the bot itself:
 ```bash
 python3 bots/bb_bot.py --symbol BTC
 ```
+
+---
+
+## A correction
+
+This README previously reported *290 trades, 63.8% win rate, +$10,348*. Those figures came from an audit script that had drifted from the deployed strategy on five separate counts, every one of them flattering — it was measuring a configuration that had never actually run. The five: stop-loss snap threshold 85% vs the deployed 95%, EMA-200 vs EMA-150, 100% of capital per trade vs 25%, maker fees assumed on both legs when entry and take-profit are actually market orders, and a "win" counted as a take-profit exit rather than a net gain.
+
+Corrected 2026-08-12. Gate 1 now imports the live strategy module directly, so the audit and the bot cannot diverge again.
 
 ---
 
