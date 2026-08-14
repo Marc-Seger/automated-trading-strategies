@@ -18,9 +18,9 @@ This is not a signal-following bot. Every entry and exit here comes from indicat
 | Bollinger Bounce | Band touch + close back inside (reversal) |
 | RSI Reversal | RSI exiting an oversold/overbought zone |
 
-**A backtest dashboard** (Flask + a single-page UI) to run any strategy against real MEXC OHLCV history, tune parameters, and inspect trade-by-trade results, plus a live/paper bot status view.
+**A backtest dashboard** (Flask + a single-page UI) to run any strategy against real MEXC OHLCV history, tune parameters, and inspect trade-by-trade results, plus a live/paper bot status view. It runs on a cloud VPS at **[bot.marcseger.dev](https://bot.marcseger.dev)** — the live bot's current position, trade history and the full methodology docs are all there.
 
-**A validation pipeline** for the strategy that's actually meant to run with money on the line.
+**A validation pipeline**, applied so far to the one strategy that runs live.
 
 ---
 
@@ -36,6 +36,8 @@ Backtest over a full year of real 15-minute data (2025-08 → 2026-08), 25% sizi
 
 **Fees dominate.** The same year with fees switched off returns +$3,078, so roughly three quarters of the gross edge goes to the exchange. At 10x a round trip costs ~1.2% of margin, which means a take-profit on a small move can still close at a net loss.
 
+**What these numbers still don't capture.** Paper mode uses real prices and charges real fees, but assumes zero slippage and instant fills, so live trading would run somewhat below this. The backtest also can't tell a stop-limit fill from the market backstop, so stop-loss exits are costed at the cheaper maker rate. Both push the figures optimistic.
+
 - **Gate 1** (`research/gate1_audit.py`): calls `strategies/bb_channel.simulate` with no parameter overrides, so it can only ever measure the frozen constants the live bot imports from that same module.
 - **Gate 2** (`research/gate2_grid_search.py`): a 16,200-combination grid search, 67.5% of combinations profitable — the strategy family isn't balanced on a knife edge. Note the frozen set ranks 14th of 16,200 *on the window it was selected from*, so that ranking is a selection, not independent evidence. The out-of-sample figure above is the honest test.
 
@@ -48,12 +50,12 @@ The other four strategies share the same backtest engine and dashboard but haven
 ## How it works
 
 ```
-strategies/          one file per strategy, pure functions (candles in, trades out)
-backtest/            the engine that runs any strategy over historical OHLCV
-bots/bb_bot.py        the live/paper trading bot (BB Channel Rider only, for now)
-exchange/             MEXC exchange interface (ccxt)
-research/             Gate 1 audit + Gate 2 grid search scripts
-dashboard/            Flask app + UI for backtesting and live monitoring
+strategies/       one file per strategy, pure functions (candles in, trades out)
+backtest/         the engine that runs any strategy over historical OHLCV
+bots/bb_bot.py    the live/paper trading bot (BB Channel Rider only, for now)
+exchange/         MEXC exchange interface (ccxt)
+research/         Gate 1 audit + Gate 2 grid search scripts
+dashboard/        Flask app + UI for backtesting and live monitoring
 ```
 
 Strategies are self-contained: no exchange calls, no file I/O, just data in and decisions out. That's what makes the backtest and the live bot guaranteed to agree, they run the exact same code.
