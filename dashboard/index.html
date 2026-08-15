@@ -126,17 +126,37 @@
 
     /* Modal */
     #modal-backdrop { transition: opacity 0.15s; }
+
+    /* ── Mobile only (below Tailwind's md) ─────────────────────────────── */
+    @media (max-width: 767px) {
+      /* Collapsed control sidebar: hide everything except its own toggle button.
+         Scoped inside this media query so it can never affect desktop. */
+      #ind-sidebar.controls-collapsed > *:not(#ind-controls-toggle) { display: none; }
+      #ind-sidebar.controls-collapsed { gap: 0; }
+
+      /* Chart.js sizes its canvas to the container, and these containers are
+         explicit-height boxes. Give the tall ones a phone-appropriate height. */
+      #ind-price-chart-wrap { height: 260px !important; }
+      #ind-price-chart      { height: 215px !important; }
+      #ind-rsi-chart-wrap   { height: 130px !important; }
+
+      /* Native date inputs render wider than their content and overflow a 375px row. */
+      input[type="date"] { min-width: 0; max-width: 100%; }
+    }
   </style>
 </head>
-<body class="bg-gray-950 text-gray-100 h-screen flex flex-col overflow-hidden">
+<!-- Desktop is a fixed-viewport app shell (h-screen + inner scroll panes). On phones that
+     fights the browser: 100vh is wrong under the URL bar and nested scroll areas inside a
+     non-scrolling page are unusable. Below md the page just scrolls normally instead. -->
+<body class="bg-gray-950 text-gray-100 min-h-screen md:h-screen flex flex-col overflow-x-hidden md:overflow-hidden">
 
 <!-- ══════════════════════════════════════════════════════
      TAB BAR
 ══════════════════════════════════════════════════════ -->
-<div class="flex items-center justify-between bg-gray-950 border-b border-gray-800 px-5 py-3.5 flex-shrink-0">
-  <div class="flex items-center gap-7">
-    <div class="font-extrabold text-lg tracking-tight text-gray-100">Automated Trading Strategies</div>
-    <div class="flex gap-1.5 bg-gray-800 p-1.5 rounded-full">
+<div class="flex items-center justify-between bg-gray-950 border-b border-gray-800 px-4 md:px-5 py-3 md:py-3.5 flex-shrink-0">
+  <div class="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-7 w-full md:w-auto">
+    <div class="font-extrabold text-base md:text-lg tracking-tight text-gray-100">Automated Trading Strategies</div>
+    <div class="flex gap-1.5 bg-gray-800 p-1.5 rounded-full self-start">
       <button id="tab-indicator-btn" onclick="switchTab('indicator')"
         class="px-4 py-2 text-sm font-semibold rounded-full">
         Backtest
@@ -153,13 +173,22 @@
   </div>
 </div>
 
-<div class="flex flex-1 overflow-hidden">
+<div class="flex flex-col md:flex-row flex-1 md:overflow-hidden min-h-0">
 
 <!-- ══════════════════════════════════════════════════════
      INDICATOR TAB — SIDEBAR
 ══════════════════════════════════════════════════════ -->
-<aside id="ind-sidebar" class="hidden w-64 min-w-64 h-full overflow-y-auto bg-gray-900 border-r border-gray-800 flex-col p-4 gap-4 flex-shrink-0">
-  <h1 class="text-base font-bold text-indigo-400 tracking-wide">Indicator Controls</h1>
+<!-- `controls-collapsed` only bites below md (see the media query in <style>): on a phone the
+     sidebar stacks above the results, and ~900px of controls between you and the output is
+     worse than a tap to open them. On desktop the class is inert and this is the old sidebar. -->
+<aside id="ind-sidebar" class="controls-collapsed hidden w-full md:w-64 md:min-w-64 h-auto md:h-full md:overflow-y-auto bg-gray-900 border-b md:border-b-0 md:border-r border-gray-800 flex-col p-4 gap-4 flex-shrink-0">
+  <button id="ind-controls-toggle" type="button" onclick="toggleIndControls()"
+    class="md:hidden flex items-center justify-between w-full py-2 text-base font-bold text-indigo-400 tracking-wide"
+    aria-expanded="false" aria-controls="ind-sidebar">
+    <span>Indicator Controls</span>
+    <span id="ind-controls-caret" aria-hidden="true">▼</span>
+  </button>
+  <h1 class="hidden md:block text-base font-bold text-indigo-400 tracking-wide">Indicator Controls</h1>
 
   <!-- Timeframe -->
   <div>
@@ -389,9 +418,14 @@
 <!-- ══════════════════════════════════════════════════════
      INDICATOR TAB — MAIN AREA
 ══════════════════════════════════════════════════════ -->
-<main id="ind-main" class="hidden flex-1 h-full overflow-y-auto p-4 flex flex-col gap-4">
-  <!-- Stat cards -->
-  <div class="grid grid-cols-7 gap-3">
+<main id="ind-main" class="hidden flex-1 h-auto md:h-full md:overflow-y-auto p-3 md:p-4 flex flex-col gap-3 md:gap-4">
+  <!-- Stat cards. Seven across needs ~107px of text room per card, which only exists from
+       xl up (verified against the real figures: "+$730.45" needs 107px and gets 107px at
+       1280). Below that the row was overflowing its own cards — at 1024 the cards were 71px
+       wide and four of the seven values spilled out; at 768 they were 58px. The count dips
+       from 4 to 3 at md on purpose: that is where the 256px sidebar comes back, so there is
+       less room per card at 768 than at 767. -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 md:gap-3">
     <div class="bg-gray-800 rounded-lg p-3"><p class="text-xs text-gray-400">Evaluated</p><p id="ind-stat-evaluated" class="text-2xl font-bold text-gray-100 mt-1">—</p></div>
     <div class="bg-gray-800 rounded-lg p-3"><p class="text-xs text-gray-400">Win Rate</p><p id="ind-stat-winrate" class="text-2xl font-bold text-gray-100 mt-1">—</p></div>
     <div class="bg-gray-800 rounded-lg p-3"><p class="text-xs text-gray-400">Wins</p><p id="ind-stat-wins" class="text-2xl font-bold text-emerald-400 mt-1">—</p></div>
@@ -457,29 +491,30 @@
 <!-- ══════════════════════════════════════════════════════
      DOCUMENTATION TAB
 ══════════════════════════════════════════════════════ -->
-<div id="docs-main" class="hidden flex-1 h-full overflow-hidden bg-gray-950 flex">
+<div id="docs-main" class="hidden flex-1 h-auto md:h-full md:overflow-hidden bg-gray-950 flex flex-col md:flex-row min-h-0">
 
-  <!-- Docs sidebar nav -->
-  <nav class="w-52 min-w-52 h-full overflow-y-auto bg-gray-900 border-r border-gray-800 flex flex-col p-4 gap-1 flex-shrink-0 text-sm">
-    <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Contents</p>
-    <button onclick="showDoc('overview')"       class="doc-nav-btn text-left px-3 py-1.5 rounded text-indigo-400 bg-gray-800 font-semibold">Overview</button>
-    <p class="text-xs font-bold text-gray-600 uppercase tracking-wider mt-3 mb-1 px-1">Indicator Backtest</p>
-    <button onclick="showDoc('ind-ma-cross')"  class="doc-nav-btn text-left px-3 py-1.5 rounded text-gray-400 hover:text-gray-100 hover:bg-gray-800">MA Cross</button>
-    <button onclick="showDoc('ind-pvsma')"     class="doc-nav-btn text-left px-3 py-1.5 rounded text-gray-400 hover:text-gray-100 hover:bg-gray-800">Price vs MA</button>
-    <button onclick="showDoc('ind-bb')"        class="doc-nav-btn text-left px-3 py-1.5 rounded text-gray-400 hover:text-gray-100 hover:bg-gray-800">Bollinger Bands</button>
-    <button onclick="showDoc('ind-bbc')"       class="doc-nav-btn text-left px-3 py-1.5 rounded text-gray-400 hover:text-gray-100 hover:bg-gray-800">BB Channel Rider</button>
-    <button onclick="showDoc('bbc-research')"  class="doc-nav-btn text-left px-3 py-1.5 rounded text-gray-400 hover:text-gray-100 hover:bg-gray-800 pl-6">↳ Validation</button>
-    <button onclick="showDoc('ind-rsi')"       class="doc-nav-btn text-left px-3 py-1.5 rounded text-gray-400 hover:text-gray-100 hover:bg-gray-800">RSI</button>
-    <button onclick="showDoc('ind-chart')"     class="doc-nav-btn text-left px-3 py-1.5 rounded text-gray-400 hover:text-gray-100 hover:bg-gray-800">Chart Controls</button>
-    <button onclick="showDoc('ind-table')"     class="doc-nav-btn text-left px-3 py-1.5 rounded text-gray-400 hover:text-gray-100 hover:bg-gray-800">Trade Table</button>
-    <p class="text-xs font-bold text-gray-600 uppercase tracking-wider mt-3 mb-1 px-1">Reference</p>
-    <button onclick="showDoc('pnl-formula')"   class="doc-nav-btn text-left px-3 py-1.5 rounded text-gray-400 hover:text-gray-100 hover:bg-gray-800">P&amp;L Formula</button>
-    <button onclick="showDoc('data-cache')"    class="doc-nav-btn text-left px-3 py-1.5 rounded text-gray-400 hover:text-gray-100 hover:bg-gray-800">Data &amp; Cache</button>
+  <!-- Docs sidebar nav. On mobile it becomes a horizontally scrolling strip of chips
+       instead of a vertical list, so it costs one row rather than a screenful. -->
+  <nav class="w-full md:w-52 md:min-w-52 h-auto md:h-full overflow-x-auto md:overflow-x-visible md:overflow-y-auto bg-gray-900 border-b md:border-b-0 md:border-r border-gray-800 flex flex-row md:flex-col p-3 md:p-4 gap-1 flex-shrink-0 text-sm">
+    <p class="hidden md:block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Contents</p>
+    <button onclick="showDoc('overview')"       class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-indigo-400 bg-gray-800 font-semibold">Overview</button>
+    <p class="hidden md:block text-xs font-bold text-gray-600 uppercase tracking-wider mt-3 mb-1 px-1">Indicator Backtest</p>
+    <button onclick="showDoc('ind-ma-cross')"  class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">MA Cross</button>
+    <button onclick="showDoc('ind-pvsma')"     class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Price vs MA</button>
+    <button onclick="showDoc('ind-bb')"        class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Bollinger Bands</button>
+    <button onclick="showDoc('ind-bbc')"       class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">BB Channel Rider</button>
+    <button onclick="showDoc('bbc-research')"  class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800 pl-6">↳ Validation</button>
+    <button onclick="showDoc('ind-rsi')"       class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">RSI</button>
+    <button onclick="showDoc('ind-chart')"     class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Chart Controls</button>
+    <button onclick="showDoc('ind-table')"     class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Trade Table</button>
+    <p class="hidden md:block text-xs font-bold text-gray-600 uppercase tracking-wider mt-3 mb-1 px-1">Reference</p>
+    <button onclick="showDoc('pnl-formula')"   class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">P&amp;L Formula</button>
+    <button onclick="showDoc('data-cache')"    class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Data &amp; Cache</button>
   </nav>
 
   <!-- Docs content area -->
   <div class="flex-1 h-full overflow-y-auto">
-  <div class="max-w-3xl mx-auto px-8 py-8 text-gray-300 text-sm leading-relaxed">
+  <div class="max-w-3xl mx-auto px-4 md:px-8 py-6 md:py-8 text-gray-300 text-sm leading-relaxed">
 
   <!-- ── OVERVIEW ─────────────────────────────────────────── -->
   <section id="doc-overview" class="doc-section">
@@ -496,10 +531,10 @@
     <h2 class="text-xl font-bold text-gray-100 mb-2">MA Cross</h2>
     <p class="text-gray-400 mb-4">Signals when a fast moving average crosses a slow moving average.</p>
     <div class="space-y-2">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>Fast MA crosses <em>above</em> slow MA (golden cross).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>Fast MA crosses <em>below</em> slow MA (death cross).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Fast / Slow period</span><span>Lookback candles for each MA. Fast default 20, Slow default 50.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">MA type</span><span>EMA (more weight on recent candles) or SMA (equal weight).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>Fast MA crosses <em>above</em> slow MA (golden cross).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>Fast MA crosses <em>below</em> slow MA (death cross).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Fast / Slow period</span><span>Lookback candles for each MA. Fast default 20, Slow default 50.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">MA type</span><span>EMA (more weight on recent candles) or SMA (equal weight).</span></div>
     </div>
     <p class="mt-4 text-xs text-gray-500">Best for trending markets with clear momentum shifts. Produces false signals in choppy, sideways conditions.</p>
   </section>
@@ -509,10 +544,10 @@
     <h2 class="text-xl font-bold text-gray-100 mb-2">Price vs MA</h2>
     <p class="text-gray-400 mb-4">Signals when the closing price crosses above or below a single moving average.</p>
     <div class="space-y-2">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>Close crosses <em>above</em> the MA.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>Close crosses <em>below</em> the MA.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Period</span><span>MA lookback window (default 50).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">MA type</span><span>EMA or SMA.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>Close crosses <em>above</em> the MA.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>Close crosses <em>below</em> the MA.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Period</span><span>MA lookback window (default 50).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">MA type</span><span>EMA or SMA.</span></div>
     </div>
     <p class="mt-4 text-xs text-gray-500">Simpler and faster-reacting than MA Cross. More signals, more noise. Works well as a trend filter on higher timeframes.</p>
   </section>
@@ -522,10 +557,10 @@
     <h2 class="text-xl font-bold text-gray-100 mb-2">Bollinger Bands</h2>
     <p class="text-gray-400 mb-4">Bands at ±N standard deviations from a rolling SMA. Signals on band bounces (mean-reversion).</p>
     <div class="space-y-2">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>Previous close below lower band AND current close back above it (bounce).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>Previous close above upper band AND current close back below it (rejection).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Period</span><span>Rolling window for the mid-band SMA (default 20).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Std Dev</span><span>Band width multiplier. 2.0 covers ~95% of price action (default 2.0).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>Previous close below lower band AND current close back above it (bounce).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>Previous close above upper band AND current close back below it (rejection).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Period</span><span>Rolling window for the mid-band SMA (default 20).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Std Dev</span><span>Band width multiplier. 2.0 covers ~95% of price action (default 2.0).</span></div>
     </div>
     <p class="mt-4 text-xs text-gray-500">Mean-reversion strategy. Works in ranging markets; loses in strong trends where price walks the band.</p>
   </section>
@@ -537,22 +572,22 @@
 
     <h3 class="text-base font-semibold text-gray-100 mb-2">Entry</h3>
     <div class="space-y-2 mb-5">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long entry</span><span>Low wick touches or crosses below the lower band.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short entry</span><span>High wick touches or crosses above the upper band.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Entry price</span><span>The band value at the time of entry (lower band for longs, upper band for shorts).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long entry</span><span>Low wick touches or crosses below the lower band.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short entry</span><span>High wick touches or crosses above the upper band.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Entry price</span><span>The band value at the time of entry (lower band for longs, upper band for shorts).</span></div>
     </div>
 
     <h3 class="text-base font-semibold text-gray-100 mb-2">Take Profit (tracking)</h3>
     <div class="space-y-2 mb-5">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Long TP</span><span>High wick touches or crosses the <em>current</em> upper band value (tracked each candle).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Short TP</span><span>Low wick touches or crosses the <em>current</em> lower band value (tracked each candle).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-indigo-300">Flip on TP</span><span>TP hit → immediately opens opposite position (long→short or short→long) with no cooldown. The flip is skipped if the trend filter blocks the new direction.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Long TP</span><span>High wick touches or crosses the <em>current</em> upper band value (tracked each candle).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Short TP</span><span>Low wick touches or crosses the <em>current</em> lower band value (tracked each candle).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-indigo-300">Flip on TP</span><span>TP hit → immediately opens opposite position (long→short or short→long) with no cooldown. The flip is skipped if the trend filter blocks the new direction.</span></div>
     </div>
 
     <h3 class="text-base font-semibold text-gray-100 mb-2">Stop Loss &amp; SL Snap</h3>
     <div class="space-y-2 mb-5">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">SL %</span><span>Fixed percentage from entry. Set via the SL % slider in the sidebar.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">SL Snap threshold</span><span>Once price moves <em>threshold %</em> of the mid→band distance toward TP, the SL jumps to the mid-band. It then <strong>keeps trailing the mid-band on every later candle</strong> for the life of the trade — the trigger fires once, the trailing does not stop. Monotone throughout (never lowers a long SL, never raises a short SL).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">SL %</span><span>Fixed percentage from entry. Set via the SL % slider in the sidebar.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">SL Snap threshold</span><span>Once price moves <em>threshold %</em> of the mid→band distance toward TP, the SL jumps to the mid-band. It then <strong>keeps trailing the mid-band on every later candle</strong> for the life of the trade — the trigger fires once, the trailing does not stop. Monotone throughout (never lowers a long SL, never raises a short SL).</span></div>
       <div class="bg-gray-900 rounded p-3 font-mono text-xs text-gray-300">
         <p class="text-gray-500 mb-1">Example — Long at $79,000, mid=$82,000, upper=$85,000, threshold=95% (the frozen value):</p>
         <p>snap_trigger = $82,000 + 0.95 × ($85,000 − $82,000) = <span class="text-yellow-300">$84,850</span></p>
@@ -563,16 +598,16 @@
 
     <h3 class="text-base font-semibold text-gray-100 mb-2">Cooldown after SL</h3>
     <div class="space-y-2 mb-5">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Cooldown N</span><span>After a SL hit, N candles must <em>close</em> on the correct side of the entry band before the next entry is allowed.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Long cooldown</span><span>N candles closing <em>above</em> the lower band. Wicks below do not reset the count.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Short cooldown</span><span>N candles closing <em>below</em> the upper band.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">N = 0</span><span>No cooldown — re-enter on the very next band touch.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Cooldown N</span><span>After a SL hit, N candles must <em>close</em> on the correct side of the entry band before the next entry is allowed.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Long cooldown</span><span>N candles closing <em>above</em> the lower band. Wicks below do not reset the count.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Short cooldown</span><span>N candles closing <em>below</em> the upper band.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">N = 0</span><span>No cooldown — re-enter on the very next band touch.</span></div>
     </div>
 
     <h3 class="text-base font-semibold text-gray-100 mb-2">Trend Filter (optional)</h3>
     <div class="space-y-2 mb-5">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Trend EMA</span><span>Configurable EMA period. <strong>Default 150</strong>, matching the frozen live spec. Long entries only when close &gt; EMA (uptrend context). Short entries only when close &lt; EMA (downtrend context).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">On chart</span><span>Yellow EMA line overlaid on the price chart when trend filter is enabled.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Trend EMA</span><span>Configurable EMA period. <strong>Default 150</strong>, matching the frozen live spec. Long entries only when close &gt; EMA (uptrend context). Short entries only when close &lt; EMA (downtrend context).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">On chart</span><span>Yellow EMA line overlaid on the price chart when trend filter is enabled.</span></div>
     </div>
 
     <div class="bg-indigo-950 border border-indigo-800 rounded p-4 text-xs text-gray-300">
@@ -600,7 +635,7 @@
     <!-- Validated spec card -->
     <div class="bg-gray-900 border border-gray-700 rounded p-4 mb-6">
       <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Validated Strategy Spec (post grid search)</p>
-      <div class="grid grid-cols-2 gap-2 text-xs">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
         <div class="flex justify-between bg-gray-800 rounded px-3 py-2"><span class="text-gray-400">Instrument</span><span class="text-gray-100 font-mono">BTC/USDT Perp · MEXC</span></div>
         <div class="flex justify-between bg-gray-800 rounded px-3 py-2"><span class="text-gray-400">Timeframe</span><span class="text-gray-100 font-mono">15m</span></div>
         <div class="flex justify-between bg-gray-800 rounded px-3 py-2"><span class="text-gray-400">BB Period / Std Dev</span><span class="text-gray-100 font-mono">20 / 3.0σ</span></div>
@@ -620,9 +655,9 @@
     <h3 class="text-base font-semibold text-gray-100 mb-2">1 · Funding Fees</h3>
     <p class="text-gray-400 text-xs mb-3">MEXC settles perpetual funding every 8 hours (00:00 · 08:00 · 16:00 UTC). Longs pay at the prevailing rate; shorts receive.</p>
     <div class="space-y-2 mb-3">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3 text-xs"><span class="font-semibold text-gray-200">Avg funding rate</span><span class="text-gray-400">+0.003% per 8h period over the 11-month backtest window</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3 text-xs"><span class="font-semibold text-gray-200">Avg hold time</span><span class="text-gray-400">~2.1h — most positions close before the next 8h settlement window</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3 text-xs"><span class="font-semibold text-gray-200">Total drag</span><span class="text-yellow-300 font-mono">−$47.84 — measured on the superseded 100%-sizing baseline; scales with sizing, so ≈−$12 at the frozen 25%</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3 text-xs"><span class="font-semibold text-gray-200">Avg funding rate</span><span class="text-gray-400">+0.003% per 8h period over the 11-month backtest window</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3 text-xs"><span class="font-semibold text-gray-200">Avg hold time</span><span class="text-gray-400">~2.1h — most positions close before the next 8h settlement window</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3 text-xs"><span class="font-semibold text-gray-200">Total drag</span><span class="text-yellow-300 font-mono">−$47.84 — measured on the superseded 100%-sizing baseline; scales with sizing, so ≈−$12 at the frozen 25%</span></div>
     </div>
     <div class="bg-emerald-950 border border-emerald-800 rounded p-3 text-xs text-emerald-300 mb-6">
       ✓ Verdict: negligible — funding does not materially affect the strategy at ~2h hold times. Taker fees, not funding, are the cost that matters: they consume roughly three quarters of the gross edge.
@@ -905,10 +940,10 @@
     <h2 class="text-xl font-bold text-gray-100 mb-2">RSI</h2>
     <p class="text-gray-400 mb-4">Relative Strength Index (0–100). Signals when RSI exits oversold or overbought zones. Sub-plot shown below the price chart.</p>
     <div class="space-y-2">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>RSI crosses <em>above</em> the oversold threshold (default 30).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>RSI crosses <em>below</em> the overbought threshold (default 70).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Period</span><span>RSI lookback (default 14). Shorter = more reactive, more noise.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Oversold / Overbought</span><span>Zone thresholds. Crossing the oversold line upward = long; crossing overbought downward = short.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>RSI crosses <em>above</em> the oversold threshold (default 30).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>RSI crosses <em>below</em> the overbought threshold (default 70).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Period</span><span>RSI lookback (default 14). Shorter = more reactive, more noise.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Oversold / Overbought</span><span>Zone thresholds. Crossing the oversold line upward = long; crossing overbought downward = short.</span></div>
     </div>
     <p class="mt-4 text-xs text-gray-500">Counter-trend / mean-reversion. RSI can stay extreme for many candles in strong trends, causing frequent stop-outs.</p>
   </section>
@@ -917,12 +952,12 @@
   <section id="doc-ind-chart" class="doc-section hidden">
     <h2 class="text-xl font-bold text-gray-100 mb-4">Indicator Backtest — Chart Controls</h2>
     <div class="space-y-2">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Zoom</span><span><span class="font-mono text-yellow-300">Ctrl + scroll wheel</span> to zoom in/out. Both price chart and sub-plot zoom in sync.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Pan</span><span><span class="font-mono text-yellow-300">Scroll wheel</span> (no Ctrl) pans left/right. <span class="font-mono text-yellow-300">Click and drag</span> also pans. Both charts move together.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Reset Zoom</span><span>Button top-right of the price chart restores the full view.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">B markers</span><span>Green circle = trade entry (resolved). Grey circle = open trade (no exit yet).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">S markers</span><span>Red circle = trade exit (TP or SL hit). Hover for tooltip with direction, outcome, and P&amp;L.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Sub-plot sync</span><span>RSI sub-plot x-axis is locked to the price chart. Zooming or panning one moves both. Vertical grid lines are mirrored exactly.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Zoom</span><span><span class="font-mono text-yellow-300">Ctrl + scroll wheel</span> to zoom in/out. Both price chart and sub-plot zoom in sync.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Pan</span><span><span class="font-mono text-yellow-300">Scroll wheel</span> (no Ctrl) pans left/right. <span class="font-mono text-yellow-300">Click and drag</span> also pans. Both charts move together.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Reset Zoom</span><span>Button top-right of the price chart restores the full view.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">B markers</span><span>Green circle = trade entry (resolved). Grey circle = open trade (no exit yet).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">S markers</span><span>Red circle = trade exit (TP or SL hit). Hover for tooltip with direction, outcome, and P&amp;L.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Sub-plot sync</span><span>RSI sub-plot x-axis is locked to the price chart. Zooming or panning one moves both. Vertical grid lines are mirrored exactly.</span></div>
     </div>
   </section>
 
@@ -930,12 +965,12 @@
   <section id="doc-ind-table" class="doc-section hidden">
     <h2 class="text-xl font-bold text-gray-100 mb-4">Indicator Backtest — Trade Table</h2>
     <div class="space-y-2">
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Entry Date</span><span>Timestamp of the signal candle — when the trade opens.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Entry / SL / TP</span><span>Prices used. For BB Channel, TP shows "—" (band-based, not fixed).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Move %</span><span>Raw price move before leverage. Positive = moved in trade direction.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">P&amp;L</span><span>Net dollar profit/loss after fees: <span class="font-mono">(net_pnl % / 100) × trade_size</span>.</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Outcome</span><span>TAKE PROFIT, STOP LOSS, or OPEN (still running at end of data).</span></div>
-      <div class="grid grid-cols-[160px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Exit Date</span><span>Candle where SL or TP was hit. Blank for open trades.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Entry Date</span><span>Timestamp of the signal candle — when the trade opens.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Entry / SL / TP</span><span>Prices used. For BB Channel, TP shows "—" (band-based, not fixed).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Move %</span><span>Raw price move before leverage. Positive = moved in trade direction.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">P&amp;L</span><span>Net dollar profit/loss after fees: <span class="font-mono">(net_pnl % / 100) × trade_size</span>.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Outcome</span><span>TAKE PROFIT, STOP LOSS, or OPEN (still running at end of data).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Exit Date</span><span>Candle where SL or TP was hit. Blank for open trades.</span></div>
     </div>
   </section>
 
@@ -984,7 +1019,7 @@
 <div id="live-main" class="hidden flex-1 h-full overflow-hidden bg-gray-950 flex flex-col">
 
   <!-- Header bar -->
-  <div class="flex items-center gap-3 px-6 py-3 bg-gray-900 border-b border-gray-800 flex-shrink-0 flex-wrap">
+  <div class="flex items-center gap-x-3 gap-y-2 px-4 md:px-6 py-3 bg-gray-900 border-b border-gray-800 flex-shrink-0 flex-wrap">
     <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Symbol</span>
     <input id="live-symbol" value="BTC"
       class="w-20 bg-gray-800 border border-gray-700 text-gray-100 text-sm rounded px-2 py-1 focus:outline-none focus:border-indigo-500"
@@ -1008,7 +1043,7 @@
   </div>
 
   <!-- Stat cards -->
-  <div class="flex gap-3 px-6 py-4 flex-shrink-0 flex-wrap">
+  <div class="grid grid-cols-2 sm:grid-cols-4 md:flex md:flex-wrap gap-2 md:gap-3 px-4 md:px-6 py-3 md:py-4 flex-shrink-0">
     <div class="bg-gray-900 rounded-xl px-5 py-3 flex flex-col gap-0.5 min-w-32">
       <span class="text-xs text-gray-500 uppercase tracking-wide">Trades</span>
       <span id="live-stat-trades" class="text-xl font-bold text-gray-100">—</span>
@@ -1049,14 +1084,14 @@
   </div>
 
   <!-- Live price chart -->
-  <div class="mx-6 mb-3 flex-shrink-0 bg-gray-900 rounded-xl p-4" style="height:300px;">
+  <div class="mx-4 md:mx-6 mb-3 flex-shrink-0 bg-gray-900 rounded-xl p-3 md:p-4 h-auto md:h-[300px]">
     <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
       <span id="live-chart-hdr" class="text-xs font-semibold text-gray-400 uppercase tracking-wide">
         BTC/USDT · 15M &nbsp;·&nbsp;
         <span class="text-indigo-400">BB(20, 3.0)</span> &nbsp;·&nbsp;
         <span class="text-yellow-400">EMA-150</span>
       </span>
-      <div class="flex items-center gap-1.5 text-xs text-gray-400">
+      <div class="flex items-center flex-wrap gap-1.5 text-xs text-gray-400">
         <!-- Rolling quick ranges: re-anchored to "now" on every refresh, so
              they slide rather than stretch. The date inputs below are
              day-granular and can't express a sub-day window. -->
@@ -1081,14 +1116,14 @@
         </button>
       </div>
     </div>
-    <div class="relative" style="height:252px;">
+    <div class="relative h-[220px] md:h-[252px]">
       <canvas id="live-price-canvas"></canvas>
     </div>
   </div>
 
   <!-- Current position box -->
   <div id="live-position-box"
-    class="hidden mx-6 mb-3 bg-gray-900 border border-gray-700 rounded-xl p-4 flex-shrink-0">
+    class="hidden mx-4 md:mx-6 mb-3 bg-gray-900 border border-gray-700 rounded-xl p-4 flex-shrink-0">
     <div class="flex items-center gap-3 mb-3">
       <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Open Position</span>
       <span id="live-pos-dir-badge" class="px-2 py-0.5 rounded text-xs font-bold">LONG</span>
@@ -1119,10 +1154,10 @@
   </div>
 
   <!-- Equity chart + trade table -->
-  <div class="flex flex-1 overflow-hidden gap-3 px-6 pb-4 min-h-0">
+  <div class="flex flex-col md:flex-row flex-1 md:overflow-hidden gap-3 px-4 md:px-6 pb-4 min-h-0">
 
     <!-- Equity chart -->
-    <div class="w-72 flex-shrink-0 bg-gray-900 rounded-xl p-4 flex flex-col">
+    <div class="w-full md:w-72 flex-shrink-0 bg-gray-900 rounded-xl p-4 flex flex-col h-56 md:h-auto">
       <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Equity Curve</h3>
       <div class="flex-1 relative min-h-0">
         <canvas id="live-equity-canvas"></canvas>
@@ -1131,7 +1166,7 @@
     </div>
 
     <!-- Trade table -->
-    <div class="flex-1 overflow-auto bg-gray-900 rounded-xl">
+    <div class="flex-1 overflow-auto bg-gray-900 rounded-xl max-h-[70vh] md:max-h-none">
       <table class="w-full text-xs border-collapse">
         <thead class="sticky top-0 bg-gray-800 text-gray-400">
           <tr>
@@ -1167,7 +1202,7 @@
 ══════════════════════════════════════════════════════ -->
 <div id="modal-backdrop" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden flex items-center justify-center p-4"
   onclick="if(event.target===this)closeModal()">
-  <div class="bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-screen overflow-y-auto p-6 relative">
+  <div class="bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] md:max-h-screen overflow-y-auto p-4 md:p-6 relative">
     <button onclick="closeModal()" class="absolute top-3 right-4 text-gray-400 hover:text-gray-100 text-xl font-bold">✕</button>
     <div id="modal-content"></div>
   </div>
@@ -1302,18 +1337,33 @@ function showDoc(id) {
   document.querySelectorAll(".doc-section").forEach(el => el.classList.add("hidden"));
   const el = document.getElementById("doc-" + id);
   if (el) el.classList.remove("hidden");
-  const on  = "doc-nav-btn text-left px-3 py-1.5 rounded text-indigo-400 bg-gray-800 font-semibold";
-  const off = "doc-nav-btn text-left px-3 py-1.5 rounded text-gray-400 hover:text-gray-100 hover:bg-gray-800";
+  // whitespace-nowrap + flex-shrink-0 keep these readable in the mobile horizontal strip.
+  // Set here as well as in the HTML because this overwrites the class attribute wholesale.
+  const base = "doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 ";
+  const on  = base + "text-indigo-400 bg-gray-800 font-semibold";
+  const off = base + "text-gray-400 hover:text-gray-100 hover:bg-gray-800";
   document.querySelectorAll(".doc-nav-btn").forEach(btn => {
     const match = btn.getAttribute("onclick").match(/'([^']+)'/);
     btn.className = (match && match[1] === id) ? on : off;
   });
 }
 
+/* Mobile-only: expand/collapse the Backtest control sidebar. Above md the
+   `controls-collapsed` class has no styles attached, so this is a no-op there. */
+function toggleIndControls() {
+  const sidebar = document.getElementById("ind-sidebar");
+  const collapsed = sidebar.classList.toggle("controls-collapsed");
+  document.getElementById("ind-controls-caret").textContent = collapsed ? "▼" : "▲";
+  document.getElementById("ind-controls-toggle").setAttribute("aria-expanded", String(!collapsed));
+}
+
 function switchTab(tab) {
   activeTab = tab;
-  const on  = "px-4 py-2 text-sm font-semibold rounded-full bg-gray-100 text-white";
-  const off = "px-4 py-2 text-sm font-semibold rounded-full text-gray-500 hover:text-gray-100";
+  // These overwrite the buttons' class attribute wholesale, so the responsive sizing has
+  // to live here rather than in the HTML — bootstrap calls switchTab() immediately.
+  const base = "px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold rounded-full whitespace-nowrap ";
+  const on  = base + "bg-gray-100 text-white";
+  const off = base + "text-gray-500 hover:text-gray-100";
 
   document.getElementById("ind-sidebar").classList.toggle("hidden", tab !== "indicator");
   document.getElementById("ind-sidebar").classList.toggle("flex",   tab === "indicator");
@@ -1705,7 +1755,7 @@ function openIndModal(trade) {
 
   content.innerHTML = `
     <h2 class="text-lg font-bold text-indigo-300 mb-1">${trade.symbol.split("/")[0]} — Indicator Trade</h2>
-    <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-sm mb-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm mb-4">
       <div><span class="text-gray-400">Direction:</span> ${dirBadge(trade.direction)}</div>
       <div><span class="text-gray-400">Entry date:</span> <span class="text-gray-100">${fmtDate(trade.time)}</span></div>
       <div><span class="text-gray-400">Outcome:</span> ${outcomeBadge(trade.outcome)}</div>
@@ -3083,7 +3133,7 @@ function openLiveTradeModal(i) {
 
   content.innerHTML = `
     <h2 class="text-lg font-bold text-indigo-300 mb-1">${trade.symbol || "BTC"} — Live Bot Trade</h2>
-    <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-sm mb-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm mb-4">
       <div><span class="text-gray-400">Direction:</span> ${dirBadge(trade.direction)}</div>
       <div><span class="text-gray-400">Entry date:</span> <span class="text-gray-100">${fmtDT(trade.entry_ts)}</span></div>
       <div><span class="text-gray-400">Reason:</span> <span class="${trade.reason === "TP" ? "text-emerald-400" : "text-red-400"} font-semibold">${trade.reason || "—"}</span></div>
