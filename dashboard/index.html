@@ -129,10 +129,6 @@
 
     /* ── Mobile only (below Tailwind's md) ─────────────────────────────── */
     @media (max-width: 767px) {
-      /* Collapsed control sidebar: hide everything except its own toggle button.
-         Scoped inside this media query so it can never affect desktop. */
-      #ind-sidebar.controls-collapsed > *:not(#ind-controls-toggle) { display: none; }
-      #ind-sidebar.controls-collapsed { gap: 0; }
 
       /* Chart.js sizes its canvas to the container, and these containers are
          explicit-height boxes. Give the tall ones a phone-appropriate height. */
@@ -175,23 +171,39 @@
 
 <div class="flex flex-col md:flex-row flex-1 md:overflow-hidden min-h-0">
 
-<!-- ══════════════════════════════════════════════════════
-     INDICATOR TAB — SIDEBAR
-══════════════════════════════════════════════════════ -->
-<!-- `controls-collapsed` only bites below md (see the media query in <style>): on a phone the
-     sidebar stacks above the results, and ~900px of controls between you and the output is
-     worse than a tap to open them. On desktop the class is inert and this is the old sidebar. -->
-<aside id="ind-sidebar" class="controls-collapsed hidden w-full md:w-64 md:min-w-64 h-auto md:h-full md:overflow-y-auto bg-gray-900 border-b md:border-b-0 md:border-r border-gray-800 flex-col p-4 gap-4 flex-shrink-0">
-  <button id="ind-controls-toggle" type="button" onclick="toggleIndControls()"
-    class="md:hidden flex items-center justify-between w-full py-2 text-base font-bold text-indigo-400 tracking-wide"
-    aria-expanded="false" aria-controls="ind-sidebar">
-    <span>Indicator Controls</span>
-    <span id="ind-controls-caret" aria-hidden="true">▼</span>
-  </button>
-  <h1 class="hidden md:block text-base font-bold text-indigo-400 tracking-wide">Indicator Controls</h1>
 
-  <!-- Timeframe -->
-  <div>
+<!-- ══════════════════════════════════════════════════════
+     INDICATOR TAB — MAIN AREA
+══════════════════════════════════════════════════════ -->
+<main id="ind-main" class="hidden flex-1 h-auto md:h-full md:overflow-y-auto p-3 md:p-4 flex flex-col gap-3 md:gap-4">
+  <!-- ══════════════════════════════════════════════════════
+       CONTROLS — essentials always visible, the rest behind a toggle.
+       Replaces the old 256px sidebar: a wide grid suits short sliders far
+       better than a narrow column, and the charts below get the full width.
+  ══════════════════════════════════════════════════════ -->
+  <div class="bg-gray-900 rounded-lg p-3 md:p-4 flex flex-col gap-3 flex-shrink-0">
+    <div class="flex flex-wrap items-start gap-x-6 gap-y-3">
+      <div class="flex flex-col gap-1">
+    <p class="text-xs font-semibold text-gray-400 uppercase mb-2">Strategy</p>
+    <select id="ind-strategy" onchange="updateIndStrategyUI()"
+      class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 mb-2">
+      <option value="ma_cross">MA Cross</option>
+      <option value="price_vs_ma">Price vs MA</option>
+      <option value="bollinger">Bollinger Bounce</option>
+      <option value="bb_channel" selected>BB Channel Rider (live)</option>
+      <option value="rsi">RSI Reversal</option>
+    </select></div>
+      <div class="flex flex-col gap-1">
+    <p class="text-xs font-semibold text-gray-400 uppercase mb-1">Symbol</p>
+    <div class="flex gap-1 flex-wrap mb-2">
+      <button onclick="setIndSymbol('BTC/USDT')" class="ind-sym-btn text-xs px-2 py-0.5 rounded bg-indigo-600 text-white font-bold">BTC</button>
+      <button onclick="setIndSymbol('ETH/USDT')" class="ind-sym-btn text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100">ETH</button>
+      <button onclick="setIndSymbol('SOL/USDT')" class="ind-sym-btn text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100">SOL</button>
+    </div>
+    <input type="text" id="ind-symbol-custom" placeholder="Custom (e.g. DOGE/USDT)"
+      class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none focus:border-indigo-500">
+  </div>
+      <div class="flex flex-col gap-1">
     <p class="text-xs font-semibold text-gray-400 uppercase mb-1">Candle Timeframe</p>
     <div class="flex gap-1 flex-wrap">
       <button onclick="setIndTimeframe('5m')"  class="ind-tf-btn text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100">5m</button>
@@ -201,9 +213,7 @@
       <button onclick="setIndTimeframe('1d')"  class="ind-tf-btn text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100">1d</button>
     </div>
   </div>
-
-  <!-- Date range -->
-  <div>
+      <div class="flex flex-col gap-1">
     <p class="text-xs font-semibold text-gray-400 uppercase mb-1">Date Range</p>
     <div class="flex flex-col gap-1">
       <div class="flex items-center gap-2">
@@ -220,30 +230,32 @@
       <button onclick="clearIndDates()" class="text-xs text-gray-500 hover:text-gray-300 text-left">✕ Clear dates (all history)</button>
     </div>
   </div>
-
-  <!-- Symbol -->
-  <div>
-    <p class="text-xs font-semibold text-gray-400 uppercase mb-1">Symbol</p>
-    <div class="flex gap-1 flex-wrap mb-2">
-      <button onclick="setIndSymbol('BTC/USDT')" class="ind-sym-btn text-xs px-2 py-0.5 rounded bg-indigo-600 text-white font-bold">BTC</button>
-      <button onclick="setIndSymbol('ETH/USDT')" class="ind-sym-btn text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100">ETH</button>
-      <button onclick="setIndSymbol('SOL/USDT')" class="ind-sym-btn text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100">SOL</button>
+      <div class="flex flex-col gap-1 ml-auto min-w-40">
+        <button id="ind-run-btn" onclick="runIndicatorSimulation()"
+    class="bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold py-2 rounded transition-colors text-sm">
+    ▶ Run Simulation
+  </button>
+        <p id="ind-last-run" class="text-xs text-gray-500 text-center -mt-2"></p>
+        <div id="ind-progress-wrap" class="hidden flex flex-col gap-1">
+    <div class="relative h-1.5 bg-gray-700 rounded overflow-hidden">
+      <div class="progress-slider bg-indigo-500" style="width:45%"></div>
     </div>
-    <input type="text" id="ind-symbol-custom" placeholder="Custom (e.g. DOGE/USDT)"
-      class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 focus:outline-none focus:border-indigo-500">
+    <p id="ind-progress-text" class="text-xs text-gray-500 text-center"></p>
   </div>
+        <p id="ind-cache-coverage" class="text-xs text-gray-600 text-center"></p>
+      </div>
+    </div>
 
-  <!-- Strategy -->
-  <div class="border border-gray-700 rounded p-2">
-    <p class="text-xs font-semibold text-gray-400 uppercase mb-2">Strategy</p>
-    <select id="ind-strategy" onchange="updateIndStrategyUI()"
-      class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 mb-2">
-      <option value="ma_cross">MA Cross</option>
-      <option value="price_vs_ma">Price vs MA</option>
-      <option value="bollinger">Bollinger Bands</option>
-      <option value="bb_channel" selected>BB Channel Rider (live)</option>
-      <option value="rsi">RSI</option>
-    </select>
+    <div class="border-t border-gray-800 pt-2">
+      <button id="ind-adv-toggle" type="button" onclick="toggleIndAdvanced()"
+        class="flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-gray-100"
+        aria-expanded="false" aria-controls="ind-advanced">
+        <span id="ind-adv-caret" aria-hidden="true">▼</span>
+        <span>Advanced settings</span>
+        <span class="text-gray-600 font-normal">strategy parameters, risk, fees, capital</span>
+      </button>
+      <div id="ind-advanced" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 pt-3">
+      <div>
 
     <!-- Direction -->
     <p class="text-xs text-gray-400 mb-1">Direction</p>
@@ -331,9 +343,7 @@
       </div>
     </div>
   </div>
-
-  <!-- SL / TP -->
-  <div class="border border-gray-700 rounded p-2">
+      <div>
     <p class="text-xs font-semibold text-gray-400 uppercase mb-2">SL / TP</p>
     <p class="text-xs text-gray-400 mb-1">SL %: <span id="ind-sl-val" class="text-orange-300 font-bold">1.0%</span></p>
     <input type="range" id="ind-sl" min="0.5" max="30" step="0.5" value="1" class="w-full accent-orange-400"
@@ -344,9 +354,7 @@
         oninput="document.getElementById('ind-tp-val').textContent=parseFloat(this.value).toFixed(1)+'%'">
     </div>
   </div>
-
-  <!-- Leverage & Fees -->
-  <div class="border border-gray-700 rounded p-2">
+      <div>
     <p class="text-xs font-semibold text-gray-400 uppercase mb-2">Leverage & Fees</p>
     <p class="text-xs text-gray-400 mb-1">Leverage: <span id="ind-lev-val" class="text-purple-300 font-bold">10x</span></p>
     <input type="range" id="ind-lev" min="1" max="20" step="1" value="10" class="w-full accent-purple-400"
@@ -361,9 +369,7 @@
         class="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-gray-100 flex-1">Taker</button>
     </div>
   </div>
-
-  <!-- Capital -->
-  <div class="border border-gray-700 rounded p-2">
+      <div>
     <p class="text-xs font-semibold text-gray-400 uppercase mb-2">Capital</p>
     <div class="flex items-center gap-2 mb-2">
       <span class="text-xs text-gray-400" style="min-width:72px">Starting</span>
@@ -399,26 +405,10 @@
       </div>
     </div>
   </div>
-
-  <button id="ind-run-btn" onclick="runIndicatorSimulation()"
-    class="mt-auto bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold py-2 rounded transition-colors text-sm">
-    ▶ Run Simulation
-  </button>
-  <p id="ind-last-run" class="text-xs text-gray-500 text-center -mt-2"></p>
-  <!-- Fetch progress bar -->
-  <div id="ind-progress-wrap" class="hidden flex flex-col gap-1">
-    <div class="relative h-1.5 bg-gray-700 rounded overflow-hidden">
-      <div class="progress-slider bg-indigo-500" style="width:45%"></div>
+      </div>
     </div>
-    <p id="ind-progress-text" class="text-xs text-gray-500 text-center"></p>
   </div>
-  <p id="ind-cache-coverage" class="text-xs text-gray-600 text-center"></p>
-</aside>
 
-<!-- ══════════════════════════════════════════════════════
-     INDICATOR TAB — MAIN AREA
-══════════════════════════════════════════════════════ -->
-<main id="ind-main" class="hidden flex-1 h-auto md:h-full md:overflow-y-auto p-3 md:p-4 flex flex-col gap-3 md:gap-4">
   <!-- Stat cards. Seven across needs ~107px of text room per card, which only exists from
        xl up (verified against the real figures: "+$730.45" needs 107px and gets 107px at
        1280). Below that the row was overflowing its own cards — at 1024 the cards were 71px
@@ -499,17 +489,15 @@
     <p class="hidden md:block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Contents</p>
     <button onclick="showDoc('overview')"       class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-indigo-400 bg-gray-800 font-semibold">Overview</button>
     <p class="hidden md:block text-xs font-bold text-gray-600 uppercase tracking-wider mt-3 mb-1 px-1">Indicator Backtest</p>
-    <button onclick="showDoc('ind-ma-cross')"  class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">MA Cross</button>
-    <button onclick="showDoc('ind-pvsma')"     class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Price vs MA</button>
-    <button onclick="showDoc('ind-bb')"        class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Bollinger Bands</button>
-    <button onclick="showDoc('ind-bbc')"       class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">BB Channel Rider</button>
-    <button onclick="showDoc('bbc-research')"  class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800 pl-6">↳ Validation</button>
-    <button onclick="showDoc('ind-rsi')"       class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">RSI</button>
+    <button onclick="showDoc('ind-bbc')" class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">BB Channel Rider</button>
+    <button onclick="showDoc('bbc-research')" class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800 pl-6">↳ Validation</button>
+    <button onclick="showDoc('ind-bb')" class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Bollinger Bounce</button>
+    <button onclick="showDoc('ind-ma-cross')" class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">MA Cross</button>
+    <button onclick="showDoc('ind-pvsma')" class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Price vs MA</button>
+    <button onclick="showDoc('ind-rsi')" class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">RSI Reversal</button>
+    <button onclick="showDoc('controls')" class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Backtest Controls</button>
     <button onclick="showDoc('ind-chart')"     class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Chart Controls</button>
     <button onclick="showDoc('ind-table')"     class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Trade Table</button>
-    <p class="hidden md:block text-xs font-bold text-gray-600 uppercase tracking-wider mt-3 mb-1 px-1">Reference</p>
-    <button onclick="showDoc('pnl-formula')"   class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">P&amp;L Formula</button>
-    <button onclick="showDoc('data-cache')"    class="doc-nav-btn text-left px-3 py-1.5 rounded whitespace-nowrap flex-shrink-0 text-gray-400 hover:text-gray-100 hover:bg-gray-800">Data &amp; Cache</button>
   </nav>
 
   <!-- Docs content area -->
@@ -519,17 +507,28 @@
   <!-- ── OVERVIEW ─────────────────────────────────────────── -->
   <section id="doc-overview" class="doc-section">
     <h2 class="text-xl font-bold text-gray-100 mb-1">Overview</h2>
-    <p class="text-gray-500 mb-5">Reference for all controls, strategies, and result columns in this backtest tool.</p>
-    <div class="bg-gray-900 rounded p-4">
-      <p class="text-gray-400 text-xs">Tests rule-based technical strategies on raw OHLCV data: entry/exit signals are generated purely from indicator logic (MA cross, Bollinger Bands, RSI, etc.), no external inputs.</p>
+    <p class="text-gray-500 mb-5">What this is and how the pieces fit together.</p>
+
+    <p class="text-gray-300 mb-3">This is a backtest engine for rules-based Bitcoin trading strategies, with a dashboard to run and read the results. It ships with five strategies you can test as they are, or reconfigure through the controls: every parameter that defines a strategy is adjustable, so you can build your own variant without writing code. Signals come only from price, never from external inputs or discretion, so the same inputs always produce the same trades.</p>
+
+    <p class="text-gray-300 mb-5">On top of that sits a live paper-trading bot. It runs one of these strategies, BB Channel Rider, continuously against real market data on a server, placing no real orders but logging every trade it takes. The <strong>Live Bot</strong> tab is its record. The distinction matters throughout: the backtest is a model of what a strategy would have done, the bot is a record of what one actually did.</p>
+
+    <h3 class="text-base font-semibold text-gray-100 mb-2">The five strategies</h3>
+    <div class="space-y-2 mb-5">
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-indigo-300">BB Channel Rider</span><span>Mean reversion. Buys the lower Bollinger Band and sells the upper one, treating the channel as a range to trade across. The only validated strategy, and the one running live.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Bollinger Bounce</span><span>Also mean reversion on the same bands, but waits for confirmation: price must close back <em>inside</em> the band after breaching it, rather than entering on the touch itself.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">MA Cross</span><span>Trend following. Enters when a fast moving average crosses a slow one, taking the crossover as a change of direction.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Price vs MA</span><span>Trend following, simpler. Enters when price closes through a single moving average, using it as the dividing line between up and down.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">RSI Reversal</span><span>Mean reversion on momentum rather than price. Enters when RSI leaves oversold or overbought territory, on the view that the move has exhausted itself.</span></div>
     </div>
-    <p class="mt-5 text-gray-400">Use the sidebar to navigate to any specific control or strategy. The P&amp;L formula and caching reference are at the bottom.</p>
+
+    <p class="text-gray-400">Only BB Channel Rider has been through full validation. The other four share the same engine and are there to test ideas against, not to be trusted as they stand, and results from them should be read in that light.</p>
   </section>
 
   <!-- ── SIGNAL: FILTERS ──────────────────────────────────── -->
   <section id="doc-ind-ma-cross" class="doc-section hidden">
     <h2 class="text-xl font-bold text-gray-100 mb-2">MA Cross</h2>
-    <p class="text-gray-400 mb-4">Signals when a fast moving average crosses a slow moving average.</p>
+    <p class="text-gray-300 mb-4"><strong>Trend following.</strong> Two moving averages over different lookbacks: the fast one reacts quickly to recent price, the slow one lags. When the fast crosses above the slow, recent prices have pulled decisively above the longer-run average, which is read as an uptrend beginning; the reverse is read as a downtrend. The intent is to hold a direction for as long as the trend persists and accept that turning points are always identified late, since a crossover can only be confirmed after the move has started.</p>
     <div class="space-y-2">
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>Fast MA crosses <em>above</em> slow MA (golden cross).</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>Fast MA crosses <em>below</em> slow MA (death cross).</span></div>
@@ -542,7 +541,7 @@
   <!-- ── IND: PRICE VS MA ──────────────────────────────────── -->
   <section id="doc-ind-pvsma" class="doc-section hidden">
     <h2 class="text-xl font-bold text-gray-100 mb-2">Price vs MA</h2>
-    <p class="text-gray-400 mb-4">Signals when the closing price crosses above or below a single moving average.</p>
+    <p class="text-gray-300 mb-4"><strong>Trend following, in its simplest form.</strong> A single moving average acts as the dividing line between an uptrend and a downtrend, and the strategy holds whichever side price closes on. It reacts faster than MA Cross because it needs only one line to be crossed rather than two to change order, which is an advantage in a clean trend and a liability in a choppy range, where price crosses back and forth repeatedly. Useful mainly as a baseline: any more complex trend strategy ought to beat it.</p>
     <div class="space-y-2">
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>Close crosses <em>above</em> the MA.</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>Close crosses <em>below</em> the MA.</span></div>
@@ -554,8 +553,8 @@
 
   <!-- ── IND: BOLLINGER BANDS ──────────────────────────────── -->
   <section id="doc-ind-bb" class="doc-section hidden">
-    <h2 class="text-xl font-bold text-gray-100 mb-2">Bollinger Bands</h2>
-    <p class="text-gray-400 mb-4">Bands at ±N standard deviations from a rolling SMA. Signals on band bounces (mean-reversion).</p>
+    <h2 class="text-xl font-bold text-gray-100 mb-2">Bollinger Bounce</h2>
+    <p class="text-gray-300 mb-4"><strong>Mean reversion, with confirmation.</strong> Bollinger Bands sit a set number of standard deviations either side of a moving average, so they widen when the market is volatile and contract when it is calm. Price reaching a band is unusual by construction. This strategy treats a breach as a stretched move likely to snap back, but does not act on the breach itself: it waits for price to <em>close back inside</em> the band first, taking that recovery as evidence the move is exhausted rather than continuing.</p><p class="text-gray-300 mb-4">That confirmation is the whole difference between this and BB Channel Rider, which enters the moment price touches the band. Waiting costs a worse entry price, since the recovery has already begun, and it means missing moves that never close back inside. In exchange it avoids entering in front of a breakout that keeps going. Which trade-off is better is exactly the sort of question this engine exists to test.</p>
     <div class="space-y-2">
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>Previous close below lower band AND current close back above it (bounce).</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>Previous close above upper band AND current close back below it (rejection).</span></div>
@@ -568,19 +567,19 @@
   <!-- ── IND: BB CHANNEL RIDER ─────────────────────────────── -->
   <section id="doc-ind-bbc" class="doc-section hidden">
     <h2 class="text-xl font-bold text-gray-100 mb-2">BB Channel Rider</h2>
-    <p class="text-gray-400 mb-5">A state-machine strategy that rides the full width of the Bollinger channel, flipping between long and short as price bounces between bands.</p>
+    <p class="text-gray-300 mb-4"><strong>Mean reversion, taken at the touch.</strong> This treats the Bollinger channel as a range to be traded across: buy the lower band, sell the upper one, and take the width of the channel as the profit target. Where Bollinger Bounce waits for price to close back inside the band, this enters the instant the band is reached, on the view that the band level itself is where the edge is and waiting gives it away.</p><p class="text-gray-300 mb-4">Because the target is the opposite band rather than a fixed distance, the strategy adapts to volatility automatically: a wide channel means a bigger target and a wider stop, a narrow one means both shrink. A trend filter keeps it from buying dips in a falling market, and when a position closes at target with price still at the band, it reverses immediately rather than sitting idle. Everything below is the exact specification, frozen on 2026-05-10 and running live since.</p>
 
     <h3 class="text-base font-semibold text-gray-100 mb-2">Entry</h3>
     <div class="space-y-2 mb-5">
-      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long entry</span><span>Low wick touches or crosses below the lower band.</span></div>
-      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short entry</span><span>High wick touches or crosses above the upper band.</span></div>
-      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Entry price</span><span>The band value at the time of entry (lower band for longs, upper band for shorts).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long entry</span><span>The low of the forming candle reaches the lower band <em>as computed from the last closed candle</em>. The band is fixed before the candle opens, so the level is known in advance.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short entry</span><span>The high of the forming candle reaches the upper band as computed from the last closed candle.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Entry price</span><span>The band level itself, lower for longs and upper for shorts. Because that level is known before the candle opens, it can be resting as a limit order rather than chased.</span></div>
     </div>
 
     <h3 class="text-base font-semibold text-gray-100 mb-2">Take Profit (tracking)</h3>
     <div class="space-y-2 mb-5">
-      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Long TP</span><span>High wick touches or crosses the <em>current</em> upper band value (tracked each candle).</span></div>
-      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Short TP</span><span>Low wick touches or crosses the <em>current</em> lower band value (tracked each candle).</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Long TP</span><span>The high reaches the upper band <em>as of the last closed candle</em>. The target is recomputed at every candle close, so it moves with the channel while the position is open.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Short TP</span><span>The low reaches the lower band as of the last closed candle, recomputed at every candle close.</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-indigo-300">Flip on TP</span><span>TP hit → immediately opens opposite position (long→short or short→long) with no cooldown. The flip is skipped if the trend filter blocks the new direction.</span></div>
     </div>
 
@@ -598,10 +597,10 @@
 
     <h3 class="text-base font-semibold text-gray-100 mb-2">Cooldown after SL</h3>
     <div class="space-y-2 mb-5">
-      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Cooldown N</span><span>After a SL hit, N candles must <em>close</em> on the correct side of the entry band before the next entry is allowed.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Cooldown N</span><span><strong>Set to 2 on the live bot.</strong> After a stop-loss, that direction waits for 2 candles to close back on the correct side of the entry band before it may re-enter. The other direction is unaffected. No stop-loss has occurred in live trading so far, so this has not yet been triggered.</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Long cooldown</span><span>N candles closing <em>above</em> the lower band. Wicks below do not reset the count.</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Short cooldown</span><span>N candles closing <em>below</em> the upper band.</span></div>
-      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">N = 0</span><span>No cooldown — re-enter on the very next band touch.</span></div>
+      
     </div>
 
     <h3 class="text-base font-semibold text-gray-100 mb-2">Trend Filter (optional)</h3>
@@ -937,8 +936,8 @@
 
   <!-- ── IND: RSI ──────────────────────────────────────────── -->
   <section id="doc-ind-rsi" class="doc-section hidden">
-    <h2 class="text-xl font-bold text-gray-100 mb-2">RSI</h2>
-    <p class="text-gray-400 mb-4">Relative Strength Index (0–100). Signals when RSI exits oversold or overbought zones. Sub-plot shown below the price chart.</p>
+    <h2 class="text-xl font-bold text-gray-100 mb-2">RSI Reversal</h2>
+    <p class="text-gray-300 mb-4"><strong>Mean reversion on momentum rather than price.</strong> RSI measures how one-sided recent price action has been on a 0 to 100 scale: low readings mean sellers have dominated, high readings mean buyers have. Rather than entering while a reading is extreme, which can persist far longer than expected, this waits for RSI to <em>leave</em> the extreme, treating that exit as the point at which the one-sided pressure has run out. The sub-plot below the price chart shows the RSI line and its thresholds.</p>
     <div class="space-y-2">
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-emerald-300">Long signal</span><span>RSI crosses <em>above</em> the oversold threshold (default 30).</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-red-300">Short signal</span><span>RSI crosses <em>below</em> the overbought threshold (default 70).</span></div>
@@ -949,6 +948,46 @@
   </section>
 
   <!-- ── IND: CHART CONTROLS ───────────────────────────────── -->
+  <section id="doc-controls" class="doc-section hidden">
+    <h2 class="text-xl font-bold text-gray-100 mb-2">Backtest Controls</h2>
+    <p class="text-gray-300 mb-4">Every control that shapes a run, and what changing it does. Values marked <strong>live</strong> are the frozen BB Channel Rider settings the paper bot actually runs, so leaving them alone reproduces the live configuration.</p>
+
+    <h3 class="text-base font-semibold text-gray-100 mb-2">Market &amp; period</h3>
+    <div class="space-y-2 mb-5">
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Candle Timeframe</span><span>How much time each candle covers. Shorter candles mean more signals and more fee-paying trades; longer ones mean fewer, larger positions. <strong>15m is live.</strong> Changing this changes the strategy's behaviour completely, since every indicator is measured in candles, not hours.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Date Range</span><span>The window to test. Leave both empty to use all cached history. A short window can show almost anything, so treat small samples with suspicion.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Symbol</span><span>Which market to test. BTC, ETH and SOL are one click; any other perpetual can be typed in. The live bot trades BTC only, and results on other symbols are exploratory.</span></div>
+    </div>
+
+    <h3 class="text-base font-semibold text-gray-100 mb-2">Strategy parameters</h3>
+    <div class="space-y-2 mb-5">
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Strategy</span><span>Which rule set to run. The parameters below the selector change to match, since each strategy is defined by different inputs.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">BB Period</span><span>How many candles the Bollinger average and standard deviation are measured over. Longer is smoother and slower to react. <strong>20 is live.</strong></span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Std dev</span><span>How far the bands sit from the average, in standard deviations. Wider bands mean rarer but more extreme entries. <strong>3.0 is live</strong>, which is unusually wide and is what makes a band touch meaningful.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">SL snap threshold</span><span>How far price must travel toward the target before the stop jumps to the middle band and starts trailing. Lower values protect profit sooner but get stopped out by noise more often. <strong>95% is live.</strong></span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Cooldown candles</span><span>After a stop-loss, how many candles that direction waits before it may re-enter. <strong>2 is live.</strong></span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Trend filter (EMA)</span><span>When on, longs are only allowed above the EMA and shorts only below it, which stops the strategy buying every dip in a falling market. <strong>On, period 150, is live.</strong></span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Fast / Slow period</span><span>For the moving-average strategies: the two lookbacks being compared. The gap between them sets how often crossovers happen.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">RSI period / thresholds</span><span>For RSI Reversal: the lookback, and the oversold and overbought levels an exit from which triggers a trade. Defaults are 14, 30 and 70.</span></div>
+    </div>
+
+    <h3 class="text-base font-semibold text-gray-100 mb-2">Risk &amp; costs</h3>
+    <div class="space-y-2 mb-5">
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">SL %</span><span>Stop distance from entry, before leverage. <strong>1.0% is live</strong>, which at 10x is 10% of the money committed to the trade.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">TP %</span><span>Only used by strategies with a fixed target. BB Channel Rider ignores it, because its target is the opposite band and therefore moves with volatility.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Leverage</span><span>Multiplies both the gain and the loss on every move, and the fees with them. <strong>10x is live.</strong> It does not change the win rate, only the size of each outcome.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Fees</span><span>Which cost model to charge. <strong>None</strong> shows the gross edge, useful only for comparison. <strong>Maker</strong> assumes every order rests on the book; <strong>Taker</strong> assumes every order crosses it. Real trading falls between the two, and the difference is not small: on this strategy fees consume roughly three quarters of the gross edge.</span></div>
+    </div>
+
+    <h3 class="text-base font-semibold text-gray-100 mb-2">Capital</h3>
+    <div class="space-y-2 mb-5">
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Starting capital</span><span>The balance the run begins with. Profits compound into later position sizes, so this affects the shape of the equity curve and not just its scale.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Per trade</span><span>How much to commit per position, either a fixed dollar amount or a percentage of current capital. <strong>25% of capital is live.</strong> A percentage compounds; a flat amount does not.</span></div>
+    </div>
+
+    <p class="text-gray-400">Changing any of these produces a valid backtest but no longer describes the deployed bot. Only the values marked live do that.</p>
+  </section>
+
   <section id="doc-ind-chart" class="doc-section hidden">
     <h2 class="text-xl font-bold text-gray-100 mb-4">Indicator Backtest — Chart Controls</h2>
     <div class="space-y-2">
@@ -968,46 +1007,15 @@
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Entry Date</span><span>Timestamp of the signal candle — when the trade opens.</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Entry / SL / TP</span><span>Prices used. For BB Channel, TP shows "—" (band-based, not fixed).</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Move %</span><span>Raw price move before leverage. Positive = moved in trade direction.</span></div>
-      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">P&amp;L</span><span>Net dollar profit/loss after fees: <span class="font-mono">(net_pnl % / 100) × trade_size</span>.</span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">P&amp;L</span><span><strong>Net</strong> dollar profit or loss: the price move, multiplied by leverage, applied to the capital deployed on that trade, minus every cost. On the Live Bot tab that also includes funding, charged every 8 hours a position stays open. The Fees and Funding columns show those costs separately, so this column is what actually reached the balance, not a gross figure.</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Outcome</span><span>TAKE PROFIT, STOP LOSS, or OPEN (still running at end of data).</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Exit Date</span><span>Candle where SL or TP was hit. Blank for open trades.</span></div>
     </div>
   </section>
 
   <!-- ── P&L FORMULA ───────────────────────────────────────── -->
-  <section id="doc-pnl-formula" class="doc-section hidden">
-    <h2 class="text-xl font-bold text-gray-100 mb-4">P&amp;L Formula</h2>
-    <div class="bg-gray-900 rounded p-4 font-mono text-sm space-y-1 text-gray-300">
-      <p>price_move  = (exit − entry) / entry          <span class="text-gray-500">← long</span></p>
-      <p>price_move  = (entry − exit) / entry          <span class="text-gray-500">← short</span></p>
-      <p>gross_pnl % = price_move × leverage × 100</p>
-      <p>fee %       = (fee_entry + fee_exit) × leverage × 100</p>
-      <p>net_pnl %   = gross_pnl % − fee %</p>
-      <p>pnl_dollar  = (net_pnl % / 100) × trade_size</p>
-    </div>
-    <p class="text-gray-500 text-xs mt-3">Fees apply only to resolved trades (TP or SL). Open trades show gross P&amp;L with no fee deduction.</p>
-    <div class="bg-gray-900 rounded p-3 text-xs text-gray-400 mt-3 border border-gray-800">
-      <span class="text-gray-200 font-semibold">Fees are charged per leg, matching what the bot actually pays.</span>
-      Entry is a market order (<span class="font-mono text-gray-300">taker 0.06%</span>), the TP close is a market order
-      (<span class="font-mono text-gray-300">taker 0.06%</span>), and the stop-limit SL fills as a maker
-      (<span class="font-mono text-gray-300">0.04%</span>). The rare stop-market backstop is also taker but is not modelled,
-      so SL exits are costed slightly optimistically. Selecting a fee mode in the backtest controls overrides both legs with
-      a single rate for what-if comparisons.
-      <span class="block mt-2 text-yellow-300">This matters more than it looks: at 10× a round trip costs ~1.2% of margin, so a
-      take-profit on a small move can close at a net loss. Fees consume roughly three quarters of this strategy's gross edge.</span>
-    </div>
-  </section>
 
   <!-- ── DATA & CACHE ──────────────────────────────────────── -->
-  <section id="doc-data-cache" class="doc-section hidden">
-    <h2 class="text-xl font-bold text-gray-100 mb-4">Data &amp; Caching</h2>
-    <div class="space-y-2">
-      <div class="grid grid-cols-[180px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Indicator cache</span><span><span class="font-mono">data/ohlcv/indicator/{SYMBOL}_{TF}.json</span> — one file per symbol+timeframe. Gap-filling fetches only missing segments; grows incrementally.</span></div>
-      <div class="grid grid-cols-[180px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">MEXC history limits</span><span>1m≈7d · 5m≈120d · 15m≈355d · 1h≈400d · 4h≈1600d · 1d≈10yr</span></div>
-      <div class="grid grid-cols-[180px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Warmup buffer</span><span>300 extra candles fetched before the requested start date so indicators (EMA, RSI, BB) can initialise. Not shown in chart.</span></div>
-      <div class="grid grid-cols-[180px_1fr] gap-x-4 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">MEXC pagination</span><span>500 candles max per API call. Fetch loop pages automatically.</span></div>
-    </div>
-  </section>
 
   </div><!-- max-w -->
   </div><!-- scroll area -->
@@ -1348,13 +1356,13 @@ function showDoc(id) {
   });
 }
 
-/* Mobile-only: expand/collapse the Backtest control sidebar. Above md the
-   `controls-collapsed` class has no styles attached, so this is a no-op there. */
-function toggleIndControls() {
-  const sidebar = document.getElementById("ind-sidebar");
-  const collapsed = sidebar.classList.toggle("controls-collapsed");
-  document.getElementById("ind-controls-caret").textContent = collapsed ? "▼" : "▲";
-  document.getElementById("ind-controls-toggle").setAttribute("aria-expanded", String(!collapsed));
+/* Advanced settings panel. Same behaviour at every width — on a phone the
+   essentials bar wraps to a column and this simply stays collapsed by default. */
+function toggleIndAdvanced() {
+  const panel = document.getElementById("ind-advanced");
+  const open  = panel.classList.toggle("hidden") === false;
+  document.getElementById("ind-adv-caret").textContent = open ? "▲" : "▼";
+  document.getElementById("ind-adv-toggle").setAttribute("aria-expanded", String(open));
 }
 
 function switchTab(tab) {
@@ -1364,9 +1372,6 @@ function switchTab(tab) {
   const base = "px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold rounded-full whitespace-nowrap ";
   const on  = base + "bg-gray-100 text-white";
   const off = base + "text-gray-500 hover:text-gray-100";
-
-  document.getElementById("ind-sidebar").classList.toggle("hidden", tab !== "indicator");
-  document.getElementById("ind-sidebar").classList.toggle("flex",   tab === "indicator");
 
   // Main panel visibility
   document.getElementById("ind-main").classList.toggle("hidden",   tab !== "indicator");
