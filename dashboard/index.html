@@ -4,12 +4,30 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Automated Trading Strategies — Backtest Dashboard</title>
+  <!-- Without these the page unfurls as a bare link, and LinkedIn rejects it outright
+       when adding it to a profile. og:image must be an absolute URL on this host, and
+       /robots.txt must return real robots.txt text (a 404 HTML body counts as a crawl
+       failure). Both are served by explicit routes in server.py. -->
+  <meta name="description" content="Five rules-based BTC futures strategies on one backtest engine. One runs live in paper mode on a VPS, validated against the fees it actually pays.">
+  <meta property="og:title" content="Systematic BTC Strategies — Live Dashboard">
+  <meta property="og:description" content="Five rules-based BTC futures strategies on one backtest engine. One runs live in paper mode on a VPS, validated against the fees it actually pays.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bot.marcseger.dev/">
+  <meta property="og:image" content="https://bot.marcseger.dev/og-image.png">
+  <meta property="og:image:width" content="2400">
+  <meta property="og:image:height" content="1260">
+  <meta property="og:site_name" content="Marc Seger">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://bot.marcseger.dev/og-image.png">
   <!-- Inline SVG data URI: no asset file, no extra request, no /favicon.ico 404.
-       Same ink rounded-square family as the portfolio's MS mark so both sites read
-       as one property, but a distinct glyph (price touching a Bollinger band) so the
-       two are told apart in a tab strip. Fixed palette, deliberately not theme-aware —
-       a tab icon that flips with the OS theme reads as a glitch. -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314120f'/><path d='M16 28H84M16 72H84' stroke='%23f4efe6' stroke-opacity='.42' stroke-width='7' stroke-linecap='round'/><path d='M20 72L40 28L60 72L80 28' fill='none' stroke='%23e8792b' stroke-width='12' stroke-linejoin='round' stroke-linecap='round'/></svg>">
+       Same ink rounded-square family as the portfolio's MS mark so both sites read as
+       one property, with a distinct glyph so they're told apart in a tab strip.
+       Three ascending bars, chosen by rendering the candidates at 16px: a line weaving
+       between two bands read as the letter "N", and candlesticks blurred into blobs.
+       Solid shapes with gaps between them are what survives at tab size.
+       Fixed palette, deliberately not theme-aware — an icon that flips with the OS
+       theme reads as a glitch. -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314120f'/><rect x='20' y='58' width='18' height='24' rx='5' fill='%23f4efe6' fill-opacity='.55'/><rect x='41' y='44' width='18' height='38' rx='5' fill='%23f4efe6' fill-opacity='.75'/><rect x='62' y='24' width='18' height='58' rx='5' fill='%23e8792b'/></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

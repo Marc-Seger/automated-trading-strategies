@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>og image source — trading dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* 1200x630 — the standard Open Graph card size. The page IS the card, so a
+     full-page screenshot needs no cropping. Rendered at 2x (2400x1260) so it
+     stays sharp where LinkedIn shows it large or on a retina screen.
+
+     Deliberately matches portfolio-website/og-image.html: same warm-paper
+     background, same crosshatch, same type scale and accent. The two cards sit
+     next to each other in the LinkedIn Featured row and should read as one
+     property. Only the eyebrow, headline, sub and URL differ. */
+  html, body { margin:0; padding:0; width:1200px; height:630px; overflow:hidden; }
+
+  .card{
+    position:relative; width:1200px; height:630px;
+    background:#f8f5f0;
+    background-image:
+      repeating-linear-gradient(45deg,  rgba(41,36,32,0.05) 0 1px, transparent 1px 64px),
+      repeating-linear-gradient(-45deg, rgba(41,36,32,0.05) 0 1px, transparent 1px 64px);
+    font-family:'Space Grotesk', sans-serif;
+    display:flex; flex-direction:column; justify-content:center;
+    padding:0 86px; box-sizing:border-box; overflow:hidden;
+  }
+  .motif{ position:absolute; right:0; bottom:0; width:1200px; height:420px; opacity:0.5; }
+  .content{ position:relative; z-index:1; }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:19px; letter-spacing:0.16em;
+    text-transform:uppercase; color:#c25f16; margin:0 0 22px;
+  }
+  h1{
+    font-size:74px; line-height:1.04; letter-spacing:-0.025em; font-weight:700;
+    color:#292420; margin:0 0 26px; max-width:980px;
+  }
+  h1 .accent{ color:#c25f16; }
+  .sub{
+    font-size:25px; line-height:1.45; color:#6b645c; margin:0 0 34px; max-width:840px;
+  }
+  .rule{ width:72px; height:3px; background:#c25f16; margin-bottom:26px; }
+  .url{ font-family:'IBM Plex Mono', monospace; font-size:21px; color:#292420; margin:0; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Bollinger channel with price oscillating inside it, the strategy's actual shape.
+       Purely decorative: hand-drawn path, not plotted from real data. -->
+  <svg class="motif" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="band" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%"   stop-color="#c25f16" stop-opacity="0"/>
+        <stop offset="50%"  stop-color="#c25f16" stop-opacity="0.13"/>
+        <stop offset="100%" stop-color="#c25f16" stop-opacity="0.22"/>
+      </linearGradient>
+      <linearGradient id="px" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%"   stop-color="#c25f16" stop-opacity="0"/>
+        <stop offset="45%"  stop-color="#c25f16" stop-opacity="0.30"/>
+        <stop offset="100%" stop-color="#c25f16" stop-opacity="0.52"/>
+      </linearGradient>
+    </defs>
+
+    <!-- channel fill between the two bands -->
+    <path d="M0,250 C150,232 250,196 400,186 C560,176 660,208 810,196 C950,185 1060,150 1200,138
+             L1200,300 C1060,312 950,282 810,296 C660,311 560,336 400,326 C250,316 150,338 0,356 Z"
+          fill="url(#band)"/>
+    <!-- upper band -->
+    <path d="M0,250 C150,232 250,196 400,186 C560,176 660,208 810,196 C950,185 1060,150 1200,138"
+          fill="none" stroke="#c25f16" stroke-opacity="0.26" stroke-width="2.5"/>
+    <!-- lower band -->
+    <path d="M0,356 C150,338 250,316 400,326 C560,336 660,311 810,296 C950,282 1060,312 1200,300"
+          fill="none" stroke="#c25f16" stroke-opacity="0.26" stroke-width="2.5"/>
+    <!-- price oscillating between them -->
+    <path d="M0,330 C90,346 140,258 220,244 C300,230 340,300 420,314 C500,328 545,232 630,220
+             C715,208 760,286 845,290 C930,294 985,200 1070,180 C1140,164 1170,150 1200,146"
+          fill="none" stroke="url(#px)" stroke-width="3.5" stroke-linecap="round"/>
+  </svg>
+
+  <div class="content">
+    <p class="eyebrow">Marc Seger · Systematic Trading</p>
+    <div class="rule"></div>
+    <h1>Five strategies.<br>One <span class="accent">runs live</span>.</h1>
+    <p class="sub">Rules-based BTC futures, paper-traded on a VPS, validated against the fees it actually pays.</p>
+    <p class="url">bot.marcseger.dev</p>
+  </div>
+
+</div>
+</body>
+</html>

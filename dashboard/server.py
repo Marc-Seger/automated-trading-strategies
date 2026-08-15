@@ -401,6 +401,36 @@ def index():
     return send_from_directory(DASHBOARD_DIR, "index.html")
 
 
+@app.route("/og-image.png")
+def og_image():
+    """Link-preview card for LinkedIn/Slack/iMessage.
+
+    Served from an explicit route rather than /static/ so the URL in index.html's
+    og:image tag stays clean. Regenerate with a headless screenshot of
+    dashboard/og-image.html at --force-device-scale-factor=2; see this project's
+    notes for the exact command.
+    """
+    return send_from_directory(DASHBOARD_DIR, "og-image.png")
+
+
+@app.route("/robots.txt")
+def robots():
+    """Real robots.txt text.
+
+    This used to 404 with an HTML body, which crawlers read as "could not fetch
+    robots" and treat as a reason to skip the page — LinkedIn rejected the URL
+    outright because of it. Allow everything except the API, which is polled data
+    with no standalone meaning and no value in an index.
+    """
+    return (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /api/\n",
+        200,
+        {"Content-Type": "text/plain; charset=utf-8"},
+    )
+
+
 @app.route("/api/indicator_simulate", methods=["POST"])
 def api_indicator_simulate():
     from backtest.indicator_backtest import compute_ma, compute_bollinger, compute_rsi
