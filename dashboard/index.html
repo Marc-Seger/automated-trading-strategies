@@ -340,6 +340,19 @@
         <input type="range" id="ind-bbc-trend-period" min="20" max="500" step="10" value="150" class="w-full accent-indigo-500"
           oninput="document.getElementById('ind-bbc-trend-period-val').textContent=this.value">
         <p class="text-xs text-gray-500 mt-1">Long only when close &gt; EMA · Short only when close &lt; EMA</p>
+
+      <p class="text-xs font-semibold text-gray-400 uppercase mt-3 mb-1">Evaluation model</p>
+      <p class="text-xs text-gray-400 mb-1">Signal basis</p>
+      <select id="ind-signal-basis" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 mb-2">
+        <option value="last_closed" selected>Last closed candle (live bot)</option>
+        <option value="same_candle">Same candle (as previously published)</option>
+      </select>
+      <p class="text-xs text-gray-400 mb-1">Fill</p>
+      <select id="ind-fill-mode" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100">
+        <option value="band" selected>At the band</option>
+        <option value="close">At the candle close (confirmed)</option>
+      </select>
+      <p class="text-xs text-gray-500 mt-1">Changes what the backtest measures, not the strategy. Defaults match the live bot.</p>
       </div>
     </div>
   </div>
@@ -966,6 +979,7 @@
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Std dev</span><span>How far the bands sit from the average, in standard deviations. Wider bands mean rarer but more extreme entries. <strong>3.0 is live</strong>, which is unusually wide and is what makes a band touch meaningful.</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">SL snap threshold</span><span>How far price must travel toward the target before the stop jumps to the middle band and starts trailing. Lower values protect profit sooner but get stopped out by noise more often. <strong>95% is live.</strong></span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Cooldown candles</span><span>After a stop-loss, how many candles that direction waits before it may re-enter. <strong>2 is live.</strong></span></div>
+      <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Evaluation model</span><span><strong>Signal basis</strong> picks which candle's bands a wick is tested against. <em>Last closed candle</em> is what the bot does: bands come from candles that have already closed, so the level is known before the candle opens and can rest as a limit order. <em>Same candle</em> tests the wick against a band computed from that candle's own close, which is not knowable at the moment of the fill; it is kept only to reproduce previously published figures. <strong>Fill</strong> books the trade at the band, or at the candle close once the touch is confirmed. Stop-losses are unaffected, since a stop rests at a level fixed when the trade opened. <strong>Both default to the live bot.</strong> These change what the backtest measures, not the strategy.</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Trend filter (EMA)</span><span>When on, longs are only allowed above the EMA and shorts only below it, which stops the strategy buying every dip in a falling market. <strong>On, period 150, is live.</strong></span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">Fast / Slow period</span><span>For the moving-average strategies: the two lookbacks being compared. The gap between them sets how often crossovers happen.</span></div>
       <div class="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-4 gap-y-1 bg-gray-900 rounded p-3"><span class="font-semibold text-gray-200">RSI period / thresholds</span><span>For RSI Reversal: the lookback, and the oversold and overbought levels an exit from which triggers a trade. Defaults are 14, 30 and 70.</span></div>
@@ -1566,6 +1580,8 @@ async function runIndicatorSimulation() {
     cooldown_n:       parseInt(document.getElementById("ind-bbc-cooldown").value),
     trend_filter:     document.getElementById("ind-bbc-trend-filter").checked,
     trend_period:     parseInt(document.getElementById("ind-bbc-trend-period").value),
+    signal_basis:     document.getElementById("ind-signal-basis").value,
+    fill_mode:        document.getElementById("ind-fill-mode").value,
     sl_pct:        parseFloat(document.getElementById("ind-sl").value),
     tp_pct:        parseFloat(document.getElementById("ind-tp").value),
     leverage:      parseInt(document.getElementById("ind-lev").value),

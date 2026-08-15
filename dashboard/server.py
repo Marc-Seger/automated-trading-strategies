@@ -60,6 +60,23 @@ def load_config(path: str = "config.yaml") -> dict:
 
 app = Flask(__name__, static_folder=DASHBOARD_DIR)
 
+# ── CORS for the portfolio page ──────────────────────────────────────────────
+# marcseger.dev reads the live bot figures from /api/bb_bot_status so the page can
+# show a current number instead of one hard-coded at publish time and stale within
+# a day. The data is already public — the dashboard renders all of it — so this
+# only lets another origin read what a visitor can already see. Scoped to /api/
+# and to the portfolio's own origins rather than "*", since nothing else needs it.
+_CORS_ORIGINS = {"https://marcseger.dev", "https://www.marcseger.dev"}
+
+
+@app.after_request
+def _add_cors_headers(resp):
+    origin = request.headers.get("Origin")
+    if origin in _CORS_ORIGINS and request.path.startswith("/api/"):
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Vary"] = "Origin"
+    return resp
+
 # Global state (populated on startup)
 CONFIG:      dict = {}
 INDICATOR_OHLCV_CACHE: dict = {}  # symbol -> timeframe -> list of candles
@@ -466,6 +483,9 @@ def api_indicator_simulate():
         "cooldown_n":       int(params.get("cooldown_n", 2)),
         "trend_filter":     bool(params.get("trend_filter", True)),       # locked spec
         "trend_period":     int(params.get("trend_period", 150)),         # locked spec
+        # Evaluation model — see strategies/bb_channel.py. Defaults match the live bot.
+        "signal_basis":     params.get("signal_basis", "last_closed"),
+        "fill_mode":        params.get("fill_mode", "band"),
     }
 
     # --- Parse date window (always set; drives both fetch and display) ---

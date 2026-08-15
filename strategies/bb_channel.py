@@ -28,6 +28,36 @@ SIZING_PCT    = 0.25     # fraction of capital deployed per trade
 CONTRACT_LOT  = 0.0001   # BTC per contract on MEXC perpetuals
 
 # Fee rates (as decimals, not percent)
+# ── Evaluation model ─────────────────────────────────────────────────────────
+# Two choices decide what a backtest of this strategy actually measures. They
+# are not cosmetic: on a year of real 15m data they are the difference between
+# +$730 and -$399 on the SAME 312 trades.
+#
+# signal_basis — which candle's bands a wick is tested against.
+#   "last_closed"  bands from the last CLOSED candle, tested against the candle
+#                  that follows. This is what bots/bb_bot.py does: it builds
+#                  bands from closed candles only and feeds _on_price_tick() the
+#                  forming candle's high/low. The band level is therefore known
+#                  before the candle opens, so it can rest as a limit order.
+#   "same_candle"  bands from the candle being tested. Self-consistent at the
+#                  close, but the band depends on that candle's own close while
+#                  the wick that triggers it happened earlier, so the level was
+#                  not computable at the moment of the fill. Retained only to
+#                  reproduce previously published figures.
+#
+# fill_mode — where the trade is booked.
+#   "band"   at the band level. Realistic under "last_closed", where the level
+#            was known in advance; optimistic under "same_candle", where it was
+#            not.
+#   "close"  at the candle's close, i.e. confirm-then-enter. Always attainable.
+#   Stop-losses ignore this: a stop rests at a level fixed when the trade opened,
+#   so it fills at that level either way.
+#
+# Defaults match the live bot. The live bot itself never calls simulate() — it
+# imports the constants above directly — so changing these cannot affect it.
+SIGNAL_BASIS = "last_closed"
+FILL_MODE    = "band"
+
 FEE_TAKER = 0.0006   # 0.06% — market orders (entry, TP exit, backstop SL)
 FEE_MAKER = 0.0004   # 0.04% — limit orders (stop-limit SL)
 
@@ -371,6 +401,11 @@ def simulate(
     # 2x/3x/5x the fee cost and worse at every threshold, so it stays off.
     min_tp_pct   = float(params.get("min_tp_pct",   0.0))
 
+    # See "Evaluation model" at the top of this file.
+    signal_basis = params.get("signal_basis", SIGNAL_BASIS)
+    fill_mode    = params.get("fill_mode",    FILL_MODE)
+    band_lag     = 1 if signal_basis == "last_closed" else 0
+
     bb_series  = compute_bb(candles, period, std_dev)
     ema_series = compute_ema(candles, trend_period)
 
@@ -393,13 +428,19 @@ def simulate(
 
     for i in range(warmup, len(candles)):
         ts, _o, h, l, c, _v = candles[i]
-        bb  = bb_series[i]
+
+        # j indexes the candle the indicators come from: i itself under
+        # "same_candle", the one before it under "last_closed".
+        j = i - band_lag
+        if j < 1:
+            continue
+        bb = bb_series[j]
 
         if bb is None:
             continue
 
-        prev_ema   = ema_series[i - 1]
-        prev_close = candles[i - 1][4]
+        prev_ema   = ema_series[j - 1]
+        prev_close = candles[j - 1][4]
 
         if prev_ema is None:
             continue
@@ -425,8 +466,10 @@ def simulate(
             if sig is not None and (dir_filter == "both" or sig == dir_filter):
                 direction    = sig
                 upper_b, _mid_b, lower_b = bb
-                # Entry at band level (limit order fill) — matches validated backtest
-                entry_price  = lower_b if direction == "long" else upper_b
+                if fill_mode == "close":
+                    entry_price = c
+                else:
+                    entry_price = lower_b if direction == "long" else upper_b
                 entry_ts_ms  = ts
                 entry_idx    = i
                 current_sl   = sl_price(direction, entry_price, sl_pct)
@@ -467,7 +510,10 @@ def simulate(
                 sl_hit = False
 
             if tp_hit or sl_hit:
-                exit_price   = current_tp if tp_hit else current_sl
+                if tp_hit and fill_mode == "close":
+                    exit_price = c
+                else:
+                    exit_price   = current_tp if tp_hit else current_sl
                 exit_trigger = (
                     ("upper_band" if direction == "long" else "lower_band")
                     if tp_hit else "sl"
