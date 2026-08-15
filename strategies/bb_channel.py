@@ -366,8 +366,9 @@ def simulate(
     trend_on     = bool(params.get("trend_filter",  True))          # default: on
     # Experimental (2026-08-09): floor on how close TP can compress back
     # toward entry as the BB channel narrows during an open trade. Default
-    # 0.0 = disabled, matches current frozen live behavior exactly. See
-    # CLAUDE.md session notes for the fee-eaten-TP trade that motivated this.
+    # 0.0 = disabled, matches current frozen live behavior exactly. Motivated
+    # by a TP that closed at a net loss once fees were charged; backtested at
+    # 2x/3x/5x the fee cost and worse at every threshold, so it stays off.
     min_tp_pct   = float(params.get("min_tp_pct",   0.0))
 
     bb_series  = compute_bb(candles, period, std_dev)

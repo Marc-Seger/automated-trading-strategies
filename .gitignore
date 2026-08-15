@@ -1,8 +1,8 @@
 # Secrets — never commit
 .env
 
-# Claude Code internals
-.claude/
+# Editor and tooling state
+.vscode/
 
 # Python
 __pycache__/
@@ -35,10 +35,9 @@ credentials.json
 *.pem
 *.key
 
-# AI working notes — local only. May contain personal context
-# (job-search framing, salary thinking, candid self-assessment) and
-# operational detail like VPS access. Never belongs in a public repo.
-CLAUDE.md
-CLAUDE_CODE.md
-**/CLAUDE.md
-**/CLAUDE_CODE.md
+# Local working notes — never committed. These accumulate personal context
+# and operational detail (server access, deployment specifics) that does not
+# belong in a repository.
+/*.md
+!README.md
+!STRATEGY_SPEC.md
