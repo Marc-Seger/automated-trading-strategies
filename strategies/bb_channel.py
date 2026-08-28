@@ -378,7 +378,11 @@ def simulate(
       - SL  = sl_pct from entry (default 1%); params["sl_pct"] overrides
       - TP  = opposite BB band at each candle close — dynamic, not percentage-based
       - SL snap: when wick crosses snap_thresh of mid→band distance, SL → mid
-      - snap_at fixed at entry time; never recomputed mid-trade
+      - snap_at recalculated from the current candle's bands every 15m, matching
+        STRATEGY_SPEC.md and the live bot (bb_bot.py) — not fixed at entry. Fixed
+        2026-08-28: this function previously fixed snap_at at entry and never
+        recomputed it, which diverged from both the spec and the live bot (see
+        the 2026-08-24 CLAUDE.md session and the Gate 1 re-derivation notes).
       - Cooldown: cooldown_n candles (idle only) after SL, per direction
       - TP wins when both TP and SL are touched in the same candle
       - outcome derived from P&L sign (handles band-drift edge cases)
@@ -421,7 +425,7 @@ def simulate(
     entry_ts_ms: Optional[int]   = None
     entry_idx:   Optional[int]   = None
     current_sl:  Optional[float] = None
-    snap_at:     Optional[float] = None   # fixed at entry time (not recomputed)
+    snap_at:     Optional[float] = None   # recomputed every in-position candle
     snap_fired:  bool            = False
 
     warmup = max(period, trend_period)
@@ -473,7 +477,9 @@ def simulate(
                 entry_ts_ms  = ts
                 entry_idx    = i
                 current_sl   = sl_price(direction, entry_price, sl_pct)
-                # Snap threshold fixed at entry from entry-candle BB
+                # Initial value only — recomputed every in-position candle below,
+                # same as the live bot. Not checked until the next candle anyway
+                # (see the "not checked on entry candle" comment further down).
                 snap_at      = snap_trigger(direction, bb, snap_thresh)
                 snap_fired   = False
                 phase        = "in_position"
@@ -494,7 +500,9 @@ def simulate(
                 else:
                     current_tp = min(current_tp, entry_price * (1 - min_tp_pct))
 
-            # SL snap: threshold fixed at entry (not recomputed each candle)
+            # SL snap: threshold recalculated from the current candle's bands
+            # every 15m (STRATEGY_SPEC.md §snap_at), matching the live bot.
+            snap_at = snap_trigger(direction, bb, snap_thresh)
             if not snap_fired:
                 if check_snap_triggered(direction, h, l, snap_at):
                     snap_fired = True
@@ -593,7 +601,7 @@ def simulate(
                             entry_ts_ms  = ts
                             entry_idx    = i
                             current_sl   = sl_price(direction, entry_price, sl_pct)
-                            snap_at      = snap_trigger(direction, bb, snap_thresh)   # fixed at flip entry
+                            snap_at      = snap_trigger(direction, bb, snap_thresh)   # initial value, recomputed below
                             snap_fired   = False
                             phase        = "in_position"
                             flipped      = True
