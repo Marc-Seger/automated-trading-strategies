@@ -658,8 +658,8 @@
         <div class="flex justify-between bg-gray-800 rounded px-3 py-2"><span class="text-gray-400">Leverage</span><span class="text-gray-100 font-mono">10×</span></div>
       </div>
       <div class="mt-3 pt-3 border-t border-gray-700 text-xs flex flex-wrap gap-x-6 gap-y-1">
-        <span class="text-gray-500">Gate 1: 311 trades · 12 months · live-accurate fees · 25% sizing</span>
-        <span><span class="text-emerald-400 font-semibold">60.5% WR</span> <span class="text-gray-400">· +$730.45 net · 20.1% max DD · out-of-sample since freeze: 65.2% WR, +$359.73</span></span>
+        <span class="text-gray-500">Gate 1: 437 trades · 12 months · live-accurate fees · 25% sizing</span>
+        <span><span class="text-red-400 font-semibold">53.8% WR</span> <span class="text-gray-400">· -$683.90 net · 72.8% max DD · out-of-sample since freeze: 57.8% WR, +$5.62 (breakeven)</span></span>
       </div>
     </div>
 
@@ -677,7 +677,7 @@
 
     <!-- 2. Sizing Sweep -->
     <h3 class="text-base font-semibold text-gray-100 mb-2">2 · Sizing Sweep</h3>
-    <p class="text-gray-400 text-xs mb-3">Compounding amplifies both gains and drawdowns. The Calmar ratio (P&amp;L ÷ Max DD) measures return per unit of worst-case pain — <span class="text-gray-200">higher is better</span>. Doubling your position size roughly doubles profit, but it also roughly doubles the deepest hole you sit in on the way; Calmar tells you whether that trade was worth making. Note the frozen 25% is <em>not</em> the Calmar-optimal row: 50% scores slightly better but nearly doubles the drawdown, and a 37% drawdown is far harder to hold through than a 20% one.</p>
+    <p class="text-gray-400 text-xs mb-3">Compounding amplifies both gains and losses. The Calmar ratio (P&amp;L ÷ Max DD) measures return per unit of worst-case pain — negative here at every sizing level, since the full-period figure (see above) is a net loss under the corrected evaluation. Doubling position size roughly doubles the loss along with the drawdown; there is no sizing level that turns a negative-EV full-period result positive.</p>
     <div class="overflow-x-auto mb-3">
       <table class="w-full text-xs border-collapse">
         <thead>
@@ -691,40 +691,40 @@
         <tbody>
           <tr class="bg-gray-900/60 border-t border-gray-800">
             <td class="px-4 py-2 text-gray-300 border border-gray-800">10% of capital per trade</td>
-            <td class="px-4 py-2 text-right font-mono text-emerald-300 border border-gray-800">+$273.92</td>
-            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">8.45%</td>
-            <td class="px-4 py-2 text-right font-mono text-yellow-300 border border-gray-800">3.24</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">-$352.49</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">39.44%</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">-0.89</td>
           </tr>
           <tr class="bg-gray-900 border-t border-gray-800">
             <td class="px-4 py-2 text-gray-300 border border-gray-800">25% — <span class="text-emerald-400">frozen spec, live bot</span></td>
-            <td class="px-4 py-2 text-right font-mono text-emerald-300 border border-gray-800">+$730.45</td>
-            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">20.13%</td>
-            <td class="px-4 py-2 text-right font-mono text-yellow-300 border border-gray-800">3.63</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">-$683.90</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">72.81%</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">-0.94</td>
           </tr>
           <tr class="bg-gray-900/60 border-t border-gray-800">
             <td class="px-4 py-2 text-gray-300 border border-gray-800">50% of capital per trade</td>
-            <td class="px-4 py-2 text-right font-mono text-emerald-300 border border-gray-800">+$1,481.09</td>
-            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">37.53%</td>
-            <td class="px-4 py-2 text-right font-mono text-emerald-400 font-bold border border-gray-800">3.95</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">-$919.70</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">93.72%</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">-0.98</td>
           </tr>
           <tr class="bg-gray-900/60 border-t border-gray-800">
             <td class="px-4 py-2 text-gray-300 border border-gray-800">100% of capital per trade</td>
-            <td class="px-4 py-2 text-right font-mono text-emerald-300 border border-gray-800">+$1,919.11</td>
-            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">66.81%</td>
-            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">2.87</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">-$997.35</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">99.80%</td>
+            <td class="px-4 py-2 text-right font-mono text-red-400 border border-gray-800">-1.00</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <div class="bg-indigo-950 border border-indigo-800 rounded p-3 text-xs text-gray-300 mb-6">
-      <span class="text-indigo-300 font-semibold">Live recommendation:</span> start at <span class="text-gray-100 font-semibold">20–30% of capital per trade</span> — keeps drawdown manageable while still benefiting from compounding.
+    <div class="bg-yellow-950 border border-yellow-800 rounded p-3 text-xs text-yellow-200 mb-6">
+      <span class="font-semibold">This sweep uses the full-period backtest</span>, which overlaps the parameter search and is the pessimistic figure for the same reason the out-of-sample result above is the honest one. It is shown to illustrate that compounding does not rescue a negative-EV period, not as a sizing recommendation — the out-of-sample window is roughly breakeven regardless of sizing.
     </div>
 
     <!-- 3. Grid Search -->
     <h3 class="text-base font-semibold text-gray-100 mb-2">3 · Parameter Grid Search</h3>
     <p class="text-gray-400 text-xs mb-4">16,200 combinations across 6 dimensions: std_dev (2.0–4.0 step 0.25), sl_pct (0.5–2%), sl_thresh (55–95%), cooldown (1–4), EMA period (100–300), direction. Window 2025-06-01 → 2026-05-09; the spec was frozen the following day.</p>
     <div class="bg-yellow-950 border border-yellow-800 rounded p-3 text-xs text-yellow-200 mb-4">
-      <span class="font-semibold">Read the rank correctly.</span> The pre-search config (thresh 85%, EMA-200) ranked #242. Two parameters were then changed to the values ranking #14, and the spec was frozen the next day &mdash; so <span class="font-semibold">#14 is the result of choosing on this window, not independent evidence about it</span>. The genuine robustness signal here is that 67.5% of all combinations were profitable, meaning the strategy family is not balanced on a knife edge. The actual validation is the out-of-sample period after the freeze, which the parameters never saw: 66 trades, 65.2% win rate, +$359.73, 10.1% max DD.
+      <span class="font-semibold">Read the rank correctly.</span> The pre-search config (thresh 85%, EMA-200) ranked #242. Two parameters were then changed to the values ranking #14, and the spec was frozen the next day &mdash; so <span class="font-semibold">#14 is the result of choosing on this window, not independent evidence about it</span>. The 67.5%-profitable figure and the #14/#242 ranks below predate a 2026-08-28 fix to two look-ahead bugs in the backtest itself (a band computed from the candle it was tested against, and a stop-loss threshold frozen at entry) and have not been re-run under the corrected simulate() &mdash; <span class="font-semibold">treat them as provisional, not current evidence, until Gate 2 is re-run</span>. The actual validation is the out-of-sample period after the freeze, which the parameters never saw: 116 trades, 57.8% win rate, +$5.62, 18.1% max DD &mdash; essentially breakeven.
     </div>
     <div class="flex gap-3 mb-5">
       <div class="flex-1 bg-gray-900 rounded p-3 text-center border border-gray-800">
