@@ -121,6 +121,12 @@ def fresh_bot_state() -> dict:
         "pos_sl_snapped":        False,
         "pos_snap_at":           None,   # dynamic threshold, updated each candle close
         "pos_entry_ts":          None,
+        # Wick already printed when the current SL/TP levels were set mid-candle.
+        # Used to ignore the part of the forming candle that predates them —
+        # a stop cannot be hit by a price that happened before it existed.
+        "pos_lvl_candle_ts":     None,   # forming-candle ts when levels were set
+        "pos_lvl_h_at":          None,   # forming high at that moment
+        "pos_lvl_l_at":          None,   # forming low at that moment
     }
 
 
@@ -369,6 +375,10 @@ class BBBot:
         # Latest forming candle H/L — updated on every WebSocket tick
         self._forming_h: float = 0.0
         self._forming_l: float = float("inf")
+        # Forming candle id + last traded price. The price is what a level set
+        # mid-candle must be judged against; the candle's own H/L may predate it.
+        self._forming_ts: Optional[int]   = None
+        self._price:      Optional[float] = None
 
         # Capital warning thresholds fired so far (avoid repeating)
         self._warned:     set   = set()
@@ -675,10 +685,13 @@ class BBBot:
                 forming_ts = forming[0]
                 forming_h  = forming[2]
                 forming_l  = forming[3]
+                price      = forming[4]          # last trade — the live price
 
                 # Update latest forming candle price (used by flip check)
-                self._forming_h = forming_h
-                self._forming_l = forming_l
+                self._forming_h  = forming_h
+                self._forming_l  = forming_l
+                self._forming_ts = forming_ts
+                self._price      = price
 
                 # Candle close detected: forming timestamp changed
                 if prev_forming_ts is not None and forming_ts != prev_forming_ts:
@@ -708,7 +721,7 @@ class BBBot:
 
                 # Real-time price monitoring
                 if len(self._closed_candles) >= MIN_HISTORY and self._last_bb is not None:
-                    await self._on_price_tick(forming_h, forming_l)
+                    await self._on_price_tick(forming_h, forming_l, price)
 
                 save_state(self.state, self.symbol_key)
 
@@ -737,15 +750,15 @@ class BBBot:
 
     # ── Per-tick price monitoring ─────────────────────────────────────────────
 
-    async def _on_price_tick(self, h: float, l: float):
-        """Called on every WebSocket update with forming candle's current H and L."""
+    async def _on_price_tick(self, h: float, l: float, price: float):
+        """Called on every WebSocket update with forming candle's H, L and last price."""
         phase = self.state["phase"]
 
         # Entries allowed from idle AND cooldown (per-direction cd gates each direction)
         if phase in ("idle", "cooldown"):
             await self._check_entry(h, l)
         elif phase == "in_position":
-            await self._check_position(h, l)
+            await self._check_position(h, l, price)
 
     async def _check_entry(self, h: float, l: float):
         """Check if forming candle wick touches a band. Enter immediately if so."""
@@ -768,7 +781,37 @@ class BBBot:
         entry_price = lower if direction == "long" else upper
         await self._enter_position(direction, entry_price)
 
-    async def _check_position(self, h: float, l: float):
+    def _stamp_levels(self):
+        """
+        Record which candle the SL/TP levels were set in, and how much of that
+        candle's range had already printed at that moment.
+        """
+        self.state["pos_lvl_candle_ts"] = self._forming_ts
+        self.state["pos_lvl_h_at"]      = self._forming_h
+        self.state["pos_lvl_l_at"]      = self._forming_l
+
+    def _live_basis(self, h: float, l: float, price: float) -> tuple:
+        """
+        The high/low the current SL/TP levels may legitimately be tested against.
+
+        The forming candle's H/L are cumulative since the candle opened, so a
+        level set mid-candle inherits a range that partly happened before it
+        existed — that is how a freshly-snapped stop could be "hit" by a wick
+        from minutes earlier. Where the wick has not advanced beyond what was
+        already printed when the level was set, use the live price instead.
+
+        Once the candle rolls over the snapshot no longer applies and the plain
+        wick is used again, so real moves between ticks are still caught.
+        """
+        if price is None or self.state.get("pos_lvl_candle_ts") != self._forming_ts:
+            return h, l
+        h_at = self.state.get("pos_lvl_h_at")
+        l_at = self.state.get("pos_lvl_l_at")
+        if h_at is None or l_at is None:
+            return h, l
+        return (h if h > h_at else price), (l if l < l_at else price)
+
+    async def _check_position(self, h: float, l: float, price: float):
         """Check TP hit, SL snap, and SL hit on every forming candle tick."""
         direction = self.state["pos_direction"]
         tp        = self.state["pos_tp"]
@@ -782,18 +825,25 @@ class BBBot:
                 await self._close_position(direction, exit_price, reason, int(time.time() * 1000))
                 return
 
+        eff_h, eff_l = self._live_basis(h, l, price)
+
         # TP checked before SL (priority rule per STRATEGY_SPEC.md)
-        if tp is not None and check_tp_hit(direction, h, l, tp):
+        if tp is not None and check_tp_hit(direction, eff_h, eff_l, tp):
             await self._close_position(direction, tp, "TP", int(time.time() * 1000))
             return
 
         # SL snap — one-time trigger using current dynamic snap_at
         if snap_at is not None and not self.state["pos_sl_snapped"]:
-            if check_snap_triggered(direction, h, l, snap_at):
+            if check_snap_triggered(direction, eff_h, eff_l, snap_at):
                 await self._do_snap(direction)
+                # _do_snap moves the SL and re-stamps the snapshot. The wick that
+                # triggered the snap predates the new stop, so re-read both the
+                # basis and the stop before testing it.
+                eff_h, eff_l = self._live_basis(h, l, price)
+                sl = self.state["pos_sl"]
 
         # SL hit
-        if sl is not None and check_sl_hit(direction, h, l, sl):
+        if sl is not None and check_sl_hit(direction, eff_h, eff_l, sl):
             await self._close_position(direction, sl, "SL", int(time.time() * 1000))
 
     # ── Candle close handler ──────────────────────────────────────────────────
@@ -926,6 +976,9 @@ class BBBot:
             "pos_snap_at":            snap_at,
             "pos_entry_ts":           int(time.time() * 1000),
         })
+        # SL/TP were just set mid-candle — the range already printed in this
+        # candle happened before they existed and must not be able to hit them.
+        self._stamp_levels()
 
         margin = qty * fill_price * self.contract_lot / self.leverage
         logger.info(
@@ -958,6 +1011,9 @@ class BBBot:
         self.state["pos_sl_order_id"]       = sl_oid
         self.state["pos_backstop_order_id"] = bs_oid
         self.state["pos_sl_snapped"]        = True
+        # The stop just moved mid-candle — re-snapshot so the wick that triggered
+        # the snap cannot immediately "hit" the new level.
+        self._stamp_levels()
         logger.info(f"SL snapped to mid: {new_sl:.2f}  backstop: {new_backstop:.2f}")
         self.notifier.sl_snapped(new_sl, new_backstop)
 
@@ -1049,6 +1105,9 @@ class BBBot:
             "pos_sl_snapped":         False,
             "pos_snap_at":            None,
             "pos_entry_ts":           None,
+            "pos_lvl_candle_ts":      None,
+            "pos_lvl_h_at":           None,
+            "pos_lvl_l_at":           None,
         })
 
         self._check_capital_warnings()
