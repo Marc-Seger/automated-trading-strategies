@@ -66,7 +66,7 @@ Gate 1 already imports the live strategy module directly (the fix from the first
 
 ### Live
 
-Running since 2026-08-04 on a $1,000 paper balance, 27 closed trades as of 2026-08-28, net -$18.94, currently flat. Still far too small a sample to mean anything on its own, but directionally consistent with the out-of-sample figure above, both landing close to breakeven over roughly the same period. The dashboard has current numbers; a public JSON endpoint (`/api/bb_bot_status`) backs the portfolio page's live figure too.
+Running since 2026-08-04 on a $1,000 paper balance, 31 trades as of 2026-09-01, net -$59.00 (-5.9%), currently holding a position. Moved from -1.9% to -5.9% in a few weeks — the sample is still too small to mean anything on its own, which is exactly what that swing demonstrates. Still in the same small-single-digit range as the out-of-sample figure above rather than telling the old +73% story or a clear loss. The dashboard has current numbers; a public JSON endpoint (`/api/bb_bot_status`) backs the portfolio page's live figure too.
 
 The other four strategies share the same backtest engine and dashboard but haven't been through this level of validation, they're there to build and test, not to trust blindly.
 
