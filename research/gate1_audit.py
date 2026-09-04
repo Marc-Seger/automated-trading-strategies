@@ -27,7 +27,17 @@ overrides, so it can only ever measure the frozen constants the live bot imports
 from that same module. Parity is guaranteed by construction rather than by hand.
 
 Usage:
-    python3 research/gate1_audit.py [path/to/candles.json]
+    python3 research/gate1_audit.py path/to/candles.json
+
+No default candle file. There used to be one (data/research/btc_15m_1y.json),
+and it silently produced a different, worse result (438 trades, 53.4%,
+-$709.48) than the fresh fetch this audit was actually re-derived against
+(437 trades, 53.8%, -$683.90) — a caught-too-late trap for anyone re-running
+this with no argument. data/research/ is gitignored (raw market data, not
+source), so there is no committed file to default to; fetch a fresh year of
+15m BTC/USDT:USDT swap candles yourself (this repo's own machine may need to
+do it from a host that can reach MEXC — see automated-trading-strategies
+CLAUDE.md for the fetch-from-VPS workaround) and pass the path explicitly.
 """
 
 import json
@@ -42,7 +52,6 @@ from strategies.bb_channel import (  # noqa: E402
     BB_PERIOD, BB_STD, TREND_PERIOD, SL_PCT, SNAP_THRESH, COOLDOWN_N, SIZING_PCT,
 )
 
-DEFAULT_CACHE = "data/research/btc_15m_1y.json"
 START_CAPITAL = 1000.0
 LEVERAGE = 10
 
@@ -122,8 +131,12 @@ def run(candles, fee_rate, label):
 
 
 def main():
-    path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_CACHE
-    candles = load_candles(path)
+    if len(sys.argv) < 2:
+        sys.exit(
+            "Usage: python3 research/gate1_audit.py path/to/candles.json\n"
+            "No default — see the module docstring for why."
+        )
+    candles = load_candles(sys.argv[1])
 
     print("=" * 74)
     print("GATE 1 — BB Channel Rider, as deployed")
